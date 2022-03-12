@@ -1,0 +1,133 @@
+import sqlite3
+
+# connection = sqlite3.connect('test_db.db')
+# c = connection.cursor()
+
+# c.execute("drop table channel, user_in_channel, channel_var, user_channel_data, command_registration, user_cmd_count")
+
+_create_tables = [
+"pragma foreign_keys = on;"
+
+, """
+create table if not exists chatter (
+    id integer primary key,
+    name text,
+    display_name text,
+    history text
+-- , constraint pk_user primary key(user_id)
+);
+"""
+
+, """
+create table if not exists channel (
+    id integer primary key,
+    user_id integer unique,
+    name text,
+    display_name text,
+    history text
+-- , constraint pk_chan primary key(id)
+);
+"""
+
+, """
+create table if not exists user_presence (
+    id integer,
+    user_id integer references chatter(id),
+    chan_id integer references channel(id),
+    primary key(user_id, chan_id)
+--, foreign key(user_id) references chatter(id)
+--, foreign key(chan_id) references channel(id)
+-- , constraint pk_usr_in_chan primary key(user_id, chan_id)
+);
+"""
+
+, """
+create table if not exists user_chan_data (
+    -- user_id integer references chatter(id),
+    -- chan_id integer references channel(id),
+    presence_id integer primary key references user_presence(id),
+    rank text,
+    msgs_sent integer,
+    watched_since text,
+    history text
+    -- ,
+    -- variables text
+-- , constraint pk_usr_chan_data primary key(presence_id)
+-- , foreign key(user_id) references chatter(user_id)
+-- , foreign key(chan_id) references channel(chan_id)
+-- , foreign key(presence_id) references user_presence(presence_id)
+);
+"""
+
+,"""
+create table if not exists variable (
+    id integer primary key,
+    var_name text
+-- , constraint pk_var_id primary key(var_id)
+);
+"""
+
+,"""
+create table if not exists chan_var (
+    id integer primary key,
+    chan_id integer references channel(id),
+    var_id integer references variable(id),
+    value text
+-- , constraint pk_chvar primary key(chan_id)
+-- , foreign key(var_id) references variable(var_id)
+);
+"""
+
+,"""
+create table if not exists user_var (
+    id integer primary key,
+    user_id integer references chatter(id),
+    var_id integer references variable(id),
+    value text
+-- , constraint pk_user_var primary key(id)
+-- , foreign key(var_id) references variable(var_id)
+);
+"""
+
+, """
+create table if not exists command (
+    id integer primary key,
+    cmd_name text
+-- , constraint pk_cmd primary key(cmd_id)
+);
+"""
+
+, """
+create table if not exists chan_cmd_data (
+    chan_cmd_id integer primary key,
+    chan_id integer references channel(id),
+    cmd_id integer references command(id),
+    is_enabled integer,
+    chan_cmd_count integer
+-- , constraint pk_cmd_reg primary key(chan_cmd_id)
+-- , foreign key(chan_id) references channel(id)
+-- , foreign key(cmd_id) references command(id)
+);
+"""
+
+, """
+create table if not exists user_cmd_data (
+    user_id integer references chatter(id),
+    chan_cmd_id integer references chan_cmd_data(chan_cmd_id),
+    user_cmd_count integer
+, constraint pk_chan_cmd_id primary key(user_id, chan_cmd_id)
+-- , foreign key(user_id) references chatter(user_id)
+-- , foreign key(chan_cmd_id) references chan_cmd_data(chan_cmd_id)
+);
+"""
+]
+
+# for stmt in _create_tables:
+    # c.execute(stmt)
+
+# connection.commit()
+
+# if __name__ == '__main__':
+    # for table in c.execute("select * from sqlite_master where type='table'").fetchall():
+        # print(table)
+
