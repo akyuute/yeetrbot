@@ -1,33 +1,15 @@
 import re
 import random
 import string
-# from time import perf_counter
-# from os import urandom
-
-# $(eval
-#     let rd;
-#     let m = [/r|l/, /R|L/, /%20the%20/, /The/, /that/, /That/];
-#     let s = ["w", "W", "%20teh%20", "De", "dat", "Dat"];
-#     let q = "$(querystring)";
-#     for (i in s) {
-#         q = q.replace(RegExp(m[i], 'g'), s[i])
-#     };
-#     let r = decodeURIComponent(q).split('');
-#     for (i = -1; i <= r.length; i++) {
-#         rd = Math.random();
-#         if ((r[i] == 'u') && (rd < 0.2)) {
-#             r[i] = 'uwu'
-#         } else if ((r[i] == 't') && (r[i + 1] == 'h') && (rd < 0.3)) {
-#             r[i + 1] = ''
-#         };
-#         if ((/\s[a-z]/i.test(r[i] + r[i + 1]) || i == -1) && (rd < 0.1)) {
-#             r[i + 1] = r[i + 1].toLowerCase() + "-" + r[i + 1];
-#             i++
-#         }
-#     }
-#     r.join('')) UwU
 
 many_years = "Many years later, as he faced the firing squad, Colonel Aureliano Buendia was to remember that distant afternoon when his father took him to discover ice."
+
+def _get_rand_index(max_size: int, previous_val: int, repeat_prob: float|int, min_size: int=0):
+    """Returns a random integer with a specified probability that it differs from a previous value."""
+    index = previous_val
+    while min_size <= index == previous_val and repeat_prob < random.random():
+        index = int(random.random() * max_size)
+    return index
 
 def uwu(msg: str = many_years):
     """Translates a string to UwU speak."""
@@ -42,13 +24,6 @@ def uwu(msg: str = many_years):
             r"(?<=\W)that(?=\W)", r"(?<=\W)That(?=\W)", r"(?<=\W)th", "th", )
         repls = ("w", "W", "i", "teh", "Teh", "dat", "Dat", "f", ("t", "v", "d"), )
 
-        def get_rand_index(max_size: int, previous_val: int, repeat_prob: float|int, min_size: int=0):
-            """Returns a random integer with a specified probability that it differs from a previous value."""
-            index = previous_val
-            while min_size <= index == previous_val and repeat_prob < random.random():
-                index = int(random.random() * max_size)
-            return index
-
         for i, repl in enumerate(repls):
         # first, make unconditional replacements
             if isinstance(repl, list|tuple):
@@ -56,7 +31,7 @@ def uwu(msg: str = many_years):
             # we randomize which value gets chosen.
                 rand_index = 0
                 for _ in range(resp.count(matches[i])):
-                    rand_index = get_rand_index(len(repl), rand_index, 0.2)
+                    rand_index = _get_rand_index(len(repl), rand_index, 0.2)
                     resp = re.sub(matches[i], repl[rand_index], resp, 1)
                 continue
             resp = re.sub(matches[i], repl, resp)
