@@ -61,33 +61,6 @@ def uwu(msg: str = many_years):
         # logger.exception("Unexpected error: ")
 
 
-# print(uwu("something something"))
-# print(uwu("Many years later, as he faced the firing squad, Colonel Aureliano Buendia was to remember that distant afternoon when his father took him to discover ice."))
-
-# print(isinstance("2,3,4,5", tuple|list))
-# print(hasattr((0,1,2), "__iter__"))
-# print(hasattr(3, "__iter__"))
-# deck = random.sample([1, 2, 3, 4, 5, 6, 7], 1)
-# print(deck)
-
-# print(urandom(10))
-# print(random.SystemRandom.)
-
-
-
-
-# $(eval
-#     let up = Math.random() > 0.2;
-#     let q = decodeURIComponent("$(querystring)").split(''); q.map(function(char) {
-#         if (char == ' ') {
-#             return " "
-#         };
-#         if (char == 'i' || char == 'I') {
-#             return "i"
-#         };
-#         up = Math.random() > 0.2 ? !up : up;
-#         return up ? char.toUpperCase() : char.toLowerCase()
-#     }).join('')) o_O
 
 def derp(msg: str):
     try:
@@ -111,28 +84,7 @@ def derp(msg: str):
         # logger.exception("Unexpected error: ")
 
 
-# print(derp(many_years))
 
-
-
-# $(eval
-#     let match = /\s[a-z]/i;
-#     let rand;
-#     let q = "$(querystring)";
-#     let r = decodeURIComponent(q).split('');
-#     for (let i = -1; i < q.length; i++) {
-#         rand = Math.random();
-#         if ((match.test(r[i] + r[i + 1]) || i == -1) && (rand < 0.15)) {
-#             r[i + 1] = r[i + 1] + "-" + r[i + 1];
-#             i++
-#         };
-#         rand = Math.random();
-#         if ((rand < 0.15) && (r[i] == ' ')) {
-#             r[i] = '...'
-#         } else if ((r[i] == ' ') && (rand < 0.3)) {
-#             r[i] = ", uhm, "
-#         }
-#     }; r.join(''))...
 
 def uhm(msg: str):
     """Returns a string that is very unsure of itself."""
@@ -165,22 +117,7 @@ def uhm(msg: str):
         # logger.exception("Unexpected error: ")
 
 
-# print(uhm("Many years later, as he faced the firing squad, Colonel Aureliano Buendia was to remember that distant afternoon when his father took him to discover ice."*1))
-# print(uhm(""))
 
-
-# try:
-    # print(5/0)
-# except ZeroDivisionError:
-    # print("oooops")
-
-# $(eval q = decodeURIComponent("$(querystring)").split(' '); r = q; m = [/\wer$/, /have/, /^yes/, /^no(?=\W)?$/, /did/, /^do$/, /you(?=\W)/, /you$/, /^my/, /your(?!e)/, /(there|that)(?=\W)?$/, /^are$/, /^the$/]; s = ["'er", 'Hast', 'Yea', 'Nay', 'Didst', 'Doth', 'Thee', 'Thou', 'Mine', 'Thine', 'Yonder', 'art', 'Ye'];
-#     for (w in q) {
-#         for (i in m) {
-#             r[w] = r[w].replace(RegExp(m[i], 'i'), s[i])
-#         };
-#         Math.random() < 0.8 && (r[w] = r[w].replace(/(?<=\w),/, ", alas,")) || (r[w] = r[w].replace(/(e)?(?=\W?$)/, "eth"))
-#     }; r.join(' ').replace(/it( is|'s)/gi, "'tis"))
 
 def ye(msg: str):
     try:
@@ -194,9 +131,6 @@ def ye(msg: str):
     except Exception as exc:
     # logger.exception("Unexpected error: ")
         return exc.args[0]
-
-
-# print(ye(""))
 
 
 def imdad(msg: str, prefix: tuple = ("i'm ", "i am ", "im "), maxlen: int = 20):
@@ -224,10 +158,53 @@ def imdad(msg: str, prefix: tuple = ("i'm ", "i am ", "im "), maxlen: int = 20):
     else:
         return
 
-# print(imdad("I'm tired..."))
-# print(re.sub())
-4
 
 def woahthere(msg: str):
     '''Returns one of several shocked reactions when someone uses mashing.'''
+    pass
+
+def shuffle_words(msg: str):
+    '''Returns a syntactically correct message with word order and punctuation randomized.'''
+    chars = r'[!&,.:;?]+'
+    match = re.compile(chars)
+    punct = match.findall(msg)
+    words = match.sub(' ', msg).split()
+    punct += [''] * (len(words) - len(punct))
+    ends = ['!', '?', '.']
+    random.shuffle(words)
+    random.shuffle(punct)
+    resp = []
+    for w in words:
+        if w.lower() in ("the", "of", ):
+            w = w.lower()
+        if len(resp) == 0:
+            if punct[-1] in ends + ['...']:
+                resp.insert(0, w + punct.pop())
+            else:
+                resp.insert(0, w + '.')
+            continue
+        add = punct.pop()
+        resp.insert(0, w + add)
+        if add in ends:
+            resp[1] = resp[1].capitalize()
+    resp[0] = resp[0].capitalize()
+    resp = re.sub(r'(\.+)\s', r'\1', ' '.join(resp))
+    # print(f"{msg = }")
+    # return "shuffle_words(msg) = " + resp
+    return resp
+
+
+if __name__ == '__main__':
+    # print(uwu("something something"))
+    # print(uwu("Many years later, as he faced the firing squad, Colonel Aureliano Buendia was to remember that distant afternoon when his father took him to discover ice."))
+    # print(derp(many_years))
+    # print(uhm("Many years later, as he faced the firing squad, Colonel Aureliano Buendia was to remember that distant afternoon when his father took him to discover ice."*1))
+    # print(uhm(""))
+    # print(imdad("I'm tired..."))
+    # print(re.sub())
+    # print(shuffle_words(many_years))
+    # print(shuffle_words("Foo foo, foo... Foo. Foo? Foo; foo foo foo's ... foo."))
+    # print(shuffle_words("The quick, brown fox! Jumps over...the lazy dog?"))
+
+
     pass
