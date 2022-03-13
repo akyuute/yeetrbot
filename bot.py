@@ -315,12 +315,13 @@ class ChatBot(commands.Bot, Yeetrbot):
         # print(msg.lstrip(r"^.*\s"), msg.removeprefix(r"!.*\s"))
         # print(ctx.message.raw_data)
         # channel_usr = await ctx.channel.user()
-        # my_usr = await ctx.author.user()
+        my_usr = await ctx.author.user()
         # bot_usr = ctx.get_user('yeetrbot')
 
         # print(bot_usr)
         # print(channel_usr.id)
-        # print(my_usr.id)
+        print(my_usr.id)
+        print(my_usr.id)
         # print(self.regd_channels)
         # await ctx.send("I'm awake!")
     

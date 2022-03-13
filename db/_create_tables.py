@@ -80,27 +80,18 @@ create table if not exists user_var (
 """
 
 , """
--- create table if not exists command (
-  --   id integer primary key
-    -- , cmd_name text not null
--- );
-"""
 
-, """
--- create table if not exists chan_cmd_data (
-    -- chan_cmd_id integer primary key
 create table if not exists command (
     id integer primary key
     , chan_id integer not null
     , name text unique not null
-    , aliases text
     , message text
+    , aliases text
     , perms text not null
     , count integer
     , is_builtin integer not null
     , is_enabled integer not null
     , foreign key(chan_id) references channel(id)
-    -- , foreign key(cmd_id) references command(id)
 );
 """
 
@@ -115,13 +106,3 @@ create table if not exists user_cmd_data (
 );
 """
 ]
-
-# for stmt in _create_tables:
-    # c.execute(stmt)
-
-# connection.commit()
-
-# if __name__ == '__main__':
-    # for table in c.execute("select * from sqlite_master where type='table'").fetchall():
-        # print(table)
-
