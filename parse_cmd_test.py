@@ -48,14 +48,30 @@ def parse_commands_str(action: str, msg: str):
 
     # msg = msg.replace(r"\\", r"\\\\")
     # msg = re.sub('(\')', r"\\\\\\\1", msg)
+
+    msg = msg.replace(r"'", r"\'")
+    # msg = msg.replace(r'"', r'\"')
+    # msg = msg.replace(r"\\", r"\\\\")
+
     print(msg)
     print(f'{msg!r}')
-    lexer = shlex.shlex(msg, posix=True, punctuation_chars=True)
-    # lexer.escapedquotes = "'\""
-    lexer.wordchars = "'"
-    # lexer.wordchars += "\\"
-    args = list(lexer)
-# ['-r', "my longer command' name", '-a', 'alias']
+    print(f"{msg.lstrip()[0:3] = }")
+    if msg.lstrip()[0:3] == '-r ':
+        lexer = shlex.shlex(msg, posix=True, punctuation_chars=True)
+        # lexer.escapedquotes = "'"
+        # lexer.escapedquotes = "\""
+        # lexer.wordchars += "'"
+        # lexer.wordchars += "\\"
+        args = list(lexer)
+        # del args[0]
+        fields['is_raw'] = True
+        fields['command_name'] = args[1].replace("\\\'", "'")
+        # fields['command_name'] = args[1].replace(r"\\\\", "")
+    else:
+        fields['is_raw'] = False
+        args = msg.split()
+    # print(*args)
+    print(args)
 
     
     for i, arg in enumerate(args):
@@ -63,16 +79,19 @@ def parse_commands_str(action: str, msg: str):
             if arg in flags:
                 fields[arg_switch[arg]] = args[i + 1]
 
-            # if fields['is_raw'] == None:
-            #     fields['command_name'] = args[0]
+            if fields['is_raw'] == None:
+                fields['command_name'] = args[0] # .replace(r"\\\'", r"'")
             # else:
 
                 # pass
 
-    fields['command_name'] = args[0]
+    # fields['command_name'] = args[0].replace("\\'", r"'")
+    print(fields['command_name'])
+    print(*[field for field in fields.values()])
     # fields['command_name'] = ' '.join(args[:2])
     fields['message'] = msg.split(maxsplit=len([v for v in fields.values() if v != None]) * 2 + 1)[-1].replace("\\", "")
     fields['channel_id'] = None
+    print(fields)
 
     if action == 'add':
         fields['is_enabled'] = 1
@@ -93,10 +112,10 @@ def parse_commands_str(action: str, msg: str):
     cmd_switch = {k: v for k, v in zip(subcmds, cmd_mappings)}
 
     # print(cmd_switch[action])
-    print(fields)
-    print(fields['command_name'])
-    print(fields['desc'])
-    print(fields['message'])
+    # print(fields)
+    # print(fields['command_name'])
+    # print(fields['desc'])
+    # print(fields['message'])
 
 
 
@@ -116,29 +135,16 @@ def parse_commands_str(action: str, msg: str):
 if __name__ == '__main__':
     cmd = 'add'
     # msg = "mycomm -a   a's -p moderator   -d  's  -t enabled aweifj iaefj aeifjanfiaf"
-    # msg = "'mycomm thing\'' -a another_name -p moderator -d 'My description'".encode('unicode-escape').decode().replace('\\', '\\\\')
+    # msg = "\"mycomm thing\'\" -a another_name -p moderator -d \"My description\""
     # print(msg)
-    # msg = re.escape("'mycomm thing\'' -a another_name -p moderator -d 'My description'")
-    # msg = (lambda x: fr'{x}')("'mycomm thing\'' -a another_name -p moderator -d 'My description'")
-    # msg = r'{0}'.format("'mycomm thing\'' -a another_name -p moderator -d 'My description'") # .replace("\\", "\\\\")))
-    # msg = "\"mycomm thing\"' -a another_name -p moderator -d 'My description'".encode("unicode_escape").decode()
-    # msg = "\"mycomm thing' -a another_name -p moderator -d 'My description' my message is \"right here.".encode('unicode_escape').decode()
 
-    # msg = "\"mycomm\' thing\" -a another_name -p moderator -d \'My description\' my message is \"right\'s here."
 
-    # msg = "\\\"mycomm\\' thing -a another_name -p moderator -d 'My description' my message is \\\"right\\'s here." # .replace("\\", "\\\\")
-    # msg = input('> ')
-    msg = '"mycomm\' thing" -a another_name -p moderator -d "My description" my message is right\'s here.'
-    # print(msg.encode('unicode_escape').decode().replace('"', "\\\\\\\""))
-    # msg = re.sub('(\')', r"\\\\\\\1", msg)
-    # print(re.sub('(\")', r"\\\\\1", msg))
-    # print(f"{cmd = }, {msg = }")
+    # msg = '"mycomm\' thing" -a another_name -p moderator -d "My description" my message is right\'s here.'
+    # msg = '  -r "mycomm  \' \'thing" -a another_name -p moderator -d "My description" my message is right\'s here.'
+    msg = input('> ')
 
-    # msg = re.sub('(\'|\")', r"\\\1", msg)
-    # msg = re.sub('(\')', "\\\\\\\'", msg)
-    # msg = re.sub(r'\\\"', '', msg)
-    # msg = re.sub('(\")', r"\\\1", msg)
     parse_commands_str(cmd, msg)
     # print(f"{parse_commands_str('add', msg) = }")
 
-# "mycomm thing" -a another_name -p moderator -d "My description" my message is right's here.
+# -r "mycomm \\ ' '\"thing" -a another_name -p moderator -d "My description" my message is right's quote here.
+# -r "mycomm \\ ' '\"thing" -a another_name -p moderator -d "My description" my message is right's here.
