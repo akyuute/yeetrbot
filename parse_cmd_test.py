@@ -1,150 +1,101 @@
-"""
-!command subcmd msg...
-parse(msg) -> dict
-mapping[subcmd] = func
-func(dict) -> 
+import argparse
 
-register_command(dict)
-"""
+parser = argparse.ArgumentParser(prog='!cmd', description='CMD DESC', exit_on_error=False)
 
-import re
-import shlex
+subparsers = parser.add_subparsers(help="Help for all subcommands here.")
 
-def update_command():
-    pass
+cmd_add_or_edit = subparsers.add_parser('!cmd', add_help=False)
 
-def delete_command():
-    pass
+# cmd_edit.set_defaults(func=edit)
+cmd_add_or_edit.add_argument('command', nargs=1)
+cmd_add_or_edit.add_argument('--permissions', '-p', choices="everyone rank= moderator vip owner".split())
+cmd_add_or_edit.add_argument('--aliases', '-a', nargs=1)
+cmd_add_or_edit.add_argument('--count', '-c', type=int)
+cmd_add_or_edit.add_argument('--enable', action='store_true', dest='is_enabled')
+cmd_add_or_edit.add_argument('--disable', action='store_false', dest='is_enabled')
 
-def list_commands():
-    pass
+cmd_add = subparsers.add_parser('add', aliases=('a', '+'), parents=[cmd_add_or_edit], exit_on_error=False, description="Add a new custom command.", help="ADD HELP")
+cmd_edit = subparsers.add_parser('edit', aliases='e', parents=[cmd_add_or_edit], exit_on_error=False, description="Edit a custom command's message and properties.", help="EDIT HELP")
+cmd_edit.add_argument('--rename', '-r', nargs=1)
 
-def show_command():
-    pass
+other_cmd_actions = subparsers.add_parser('!cmd', add_help=False)
+other_cmd_actions.add_argument('command', nargs='+')
 
-def describe_command():
-    pass
+cmd_delete = subparsers.add_parser('delete', parents=[other_cmd_actions], aliases=('remove',), exit_on_error=False, description="Delete commands.", help="Multiple commands may be deleted at once.")
+cmd_disable = subparsers.add_parser('disable', parents=[other_cmd_actions], exit_on_error=False, description="Disable commands.", help="Multiple commands may be disabled at once.")
+cmd_enable = subparsers.add_parser('enable', parents=[other_cmd_actions], exit_on_error=False, description="Enable commands.", help="Multiple commands may be enabled at once.")
+# cmd_ = subparsers.add_parser('enable', parents=[other_cmd_actions], exit_on_error=False, description="Enable commands.", help="Multiple commands may be enabled at once.")
 
+class InvalidArgument(Exception): ...
+class InvalidSyntax(Exception): ...
 
-def parse_commands_str(action: str, msg: str):
-    '''Parses the message passed to !commands or an alias and calls the
-    corresponding function responsible for updating the datebase or relating
-    information.'''
-
-    variables = ('aliases', 'perms', 'count', 'is_enabled', 'desc')
-    # variables = ('is_raw', 'aliases', 'perms', 'count', 'is_enabled', 'desc')
-    # flags = ('-r', '-a', '-p', '-c', '-t', '-d')
-    flags = ('-a', '-p', '-c', '-t', '-d')
-    fields = dict.fromkeys(variables, None)
-    arg_switch = {k: v for k, v in zip(flags, variables)}
-    # if msg.startswith("-r "):
-        # print(re.findall(r'(\"|\')(.*?)(\1)', "-r 'my longer command name' -a alias"))
-        # args = re.findall(r'(\"|\')(.*?)(\1)', "-r 'my longer command name' -a alias")
-        # re.findall(r'(\"|\')(.*?)(\1)', "-r 'my longer command name' -a alias")[1]
-
-
-    # args = msg.split()
-    # print(args)
-
-    # msg = msg.replace(r"\\", r"\\\\")
-    # msg = re.sub('(\')', r"\\\\\\\1", msg)
-
-    msg = msg.replace(r"'", r"\'")
-    # msg = msg.replace(r'"', r'\"')
-    # msg = msg.replace(r"\\", r"\\\\")
-
-    print(msg)
-    print(f'{msg!r}')
-    print(f"{msg.lstrip()[0:3] = }")
-    if msg.lstrip()[0:3] == '-r ':
-        lexer = shlex.shlex(msg, posix=True, punctuation_chars=True)
-        # lexer.escapedquotes = "'"
-        # lexer.escapedquotes = "\""
-        # lexer.wordchars += "'"
-        # lexer.wordchars += "\\"
-        args = list(lexer)
-        # del args[0]
-        fields['is_raw'] = True
-        fields['command_name'] = args[1].replace("\\\'", "'")
-        # fields['command_name'] = args[1].replace(r"\\\\", "")
+def parse_cmd_add_edit(parser, msg):
+    if len(msg.split()) < 3:
+        return InvalidSyntax(f"ctx.author.mention(): Syntax error: Command missing message or arguments.")
     else:
-        fields['is_raw'] = False
         args = msg.split()
-    # print(*args)
-    print(args)
+        num_args = 2
+    last_result: argparse.Namespace = None
+    flags = ('--permissions', '-p', '--aliases', '-a', '--count', '-c', '--enable', '--disable')
+    if args[0] == 'edit':
+        flags += ('--rename',)
 
-    
-    for i, arg in enumerate(args):
-        if i < len(args) - 1:
-            if arg in flags:
-                fields[arg_switch[arg]] = args[i + 1]
+    # edit foo -p vip bar baz
+    # edit foo bar baz blah
+    for i, _ in enumerate(args):
+        print(i, args[i])
+        # This means 
+        if len(msg.split()) < 3:
+            return InvalidSyntax(f"ctx.author.mention(): Syntax error: Command missing message or arguments.")
 
-            if fields['is_raw'] == None:
-                fields['command_name'] = args[0] # .replace(r"\\\'", r"'")
-            # else:
+        if i < 3:
+            if args[i] in flags:
+                return InvalidArgument(f"ctx.author.mention(): Name error: {args[i]!r} is not a valid command name.")
+            continue
 
-                # pass
+        if args[i] in flags:
+            if i == len(args) - 1:
+                return "Last arg is a flag."
 
-    # fields['command_name'] = args[0].replace("\\'", r"'")
-    print(fields['command_name'])
-    print(*[field for field in fields.values()])
-    # fields['command_name'] = ' '.join(args[:2])
-    fields['message'] = msg.split(maxsplit=len([v for v in fields.values() if v != None]) * 2 + 1)[-1].replace("\\", "")
-    fields['channel_id'] = None
-    print(fields)
+            # if i % 2 != 0:
+            # if args[i-1] in flags:
+                # print("odd")
+                print("Here")
+                please_parse = args[:i+2]
+            else:
+                print("No, here")
+                print(args[:i+1])
+                # return None, last_result, msg.split(None, num_args)[-1]
+                continue
+        else:
+            print("Here, actually")
+            please_parse = args[:i+1]
 
-    if action == 'add':
-        fields['is_enabled'] = 1
-    if action == 'disable':
-        fields['is_enabled'] = 0 
-    elif action == 'enable':
-        fields['is_enabled'] = 1 
+        try:
+            last_result = parser.parse_args(please_parse)
+            num_args += 1
+            print("made it")
+            print(last_result)
+            print(args[:i+1])
+        except argparse.ArgumentError as exc:
+            print("ArgumentErr")
+            print(last_result)
+            print(args[:i+1])
+            return InvalidSyntax(f"ctx.user.mention(): Syntax error: {exc}")
+        except SystemExit as exc:
+            print("SysEx")
+            print(last_result)
+            if args[i-2] in flags:
+                # print("SUCCESSFUL")
+                return None, last_result, msg.split(None, num_args)[-1]
+            else:
+                print("Unrecognized arg")
+                return None, last_result, msg.split(None, num_args)[-1]
+                return InvalidArgument(f"ctx.user.mention(): Unrecognized argument: {args[i-1]!r}")
 
-    subcmds = ('add', 'edit', 'disable', 'enable', 'delete', 'show', 'describe', 'list')
-
-    cmd_mappings = (
-        *[update_command] * 4
-        , delete_command
-        , show_command
-        , describe_command
-        , list_commands
-    )
-    cmd_switch = {k: v for k, v in zip(subcmds, cmd_mappings)}
-
-    # print(cmd_switch[action])
-    # print(fields)
-    # print(fields['command_name'])
-    # print(fields['desc'])
-    # print(fields['message'])
-
-
-
-'''
-!command <add|edit|delete|disable|enable|show|list> -r[aw]=1 <name> -a=aliases -p=perms -c=count -t=toggle -d=description(must have quotes) <message>
-!addcmd -r[aw]=1 <name> -a=aliases -p=perms -c=count -t=toggle -d=description(must have quotes) <message>
-!editcmd -r[aw]=1 <name> -a=aliasses -p=perms -c=count -t=toggle -n=new_name -d=description(must have quotes) <message>
-!delcmd <name>
-!disable <name>
-!enable <name>
-!showcmd <name> (displays the command's name, description and message)
-!listcmd <count>
-'''
-    # return (is_raw , name , aliases , perms , count , is_builtin , is_enabled , desc , message)
-
-
-if __name__ == '__main__':
-    cmd = 'add'
-    # msg = "mycomm -a   a's -p moderator   -d  's  -t enabled aweifj iaefj aeifjanfiaf"
-    # msg = "\"mycomm thing\'\" -a another_name -p moderator -d \"My description\""
-    # print(msg)
+    print("SUCCESS")
+    print(f"{num_args = }")
+    return last_result, msg.split(None, num_args)[-1]
+    # pass
 
 
-    # msg = '"mycomm\' thing" -a another_name -p moderator -d "My description" my message is right\'s here.'
-    # msg = '  -r "mycomm  \' \'thing" -a another_name -p moderator -d "My description" my message is right\'s here.'
-    msg = input('> ')
-
-    parse_commands_str(cmd, msg)
-    # print(f"{parse_commands_str('add', msg) = }")
-
-# -r "mycomm \\ ' '\"thing" -a another_name -p moderator -d "My description" my message is right's quote here.
-# -r "mycomm \\ ' '\"thing" -a another_name -p moderator -d "My description" my message is right's here.
