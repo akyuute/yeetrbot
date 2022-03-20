@@ -40,42 +40,17 @@ class InvalidSyntax(Exception): ...
 
 
 def parse(parser, msg):
-
-
-# After which indexes can args be parsed?
-# * = yes if arg is not a flag
-
-# edit foo -p  vip bar baz
-# edit foo -p  vip -c  5
-# edit foo -i -p vip
-# 0    1   2   3   4   5
-# n    n   *   y   n   y
-
-    # edit x
-        # if args[1] in valid_flags:
-            # return "The first argument must be the command name."
-        # last_result = parser.parse_args(args)
-        # continue
-
     args = msg.split()
     if len(args) < 3:
-        return f"Syntax Error: Not enough arguments. <!cmd syntax info>"
+        return InvalidSyntax(f"ctx.author.mention(): Syntax Error: Not enough arguments. <!cmd syntax info>")
         
     num_args = 1
-    # last_result: argparse.Namespace = None
     last_result: argparse.Namespace = None
     valid_flags = ('--permissions', '-p', '--aliases', '-a', '--count', '-c', '--hide', '-i', '--disable', '-d',  ) # '--invisible', '-i')
     if args[0] == 'edit':
         valid_flags += ('--rename', '--enable', '--unhide', ) # '--visible', '-v')
 
-    # edit x y ...
-    print(args)
     for i, _ in enumerate(args):
-        #if i < 3:
-            #continue
-        print(i, args[:i+1])
-
-
 
         try:
             if len(args) == 3 and args[-1] in valid_flags:
@@ -84,37 +59,21 @@ def parse(parser, msg):
             num_args += 1
 
         except SystemExit as exc:
-            print("SysEx")
-            #print(last_result)
             # Is the next thing not a valid arg, meaning the beginning of the message?
+            if args[i-2] in valid_flags:
+                return InvalidSyntax(f"ctx.author.mention(): Unrecognized argument: {args[i]!r}")
             if not any(a in valid_flags for a in args[i+1:i+3]):
-                print("!!! No flags in next 2 words")
                 if i < 3:
                     continue
-                print(args[i])
-                # if args[i] in valid_flags:
-                    # print(args[i], "is a flag")
-                    #num_args += 1
-                return last_result, msg.split(None, num_args)[-1]
-            if args[i+1] in valid_flags:
-                print("Found a flag in next arg; continuing")
-            continue
+                break
 
         except argparse.ArgumentError as exc:
-            print("ArgErr")
-            if args[i] not in valid_flags:
-                return exc
-            elif i == len(args) - 1:
-                return exc
-            else:
-                print("Current arg is a flag; continuing")
-                #return "Invalid argument?"
+            if i == len(args) - 1 or args[i] not in valid_flags:
+                return InvalidArgument(f"ctx.author.mention(): Syntax error: {exc}")
             num_args += 1
 
 
     # if not (num_args == len(args) and args[num_args] in valid_flags):
-    print("End of loop")
-    print(f"{num_args=}, {len(args)=}")
     if not last_result:
         num_args += 1
     if len(args) == num_args:
