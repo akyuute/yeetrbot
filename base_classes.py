@@ -12,6 +12,7 @@ import my_commands.default_commands as default_commands
 # import atexit
 # from os import environ
 # from dotenv import load_dotenv
+import parse_cmd
 
 
 class AssignmentError(Exception): ...
@@ -36,7 +37,7 @@ class RegisteredChannel:
 
 class RegisteredCommand:
     def __init__(self, chan_id: int, name: str, message: str|None,
-        aliases: Sequence|str|None, perms: str, count: int, is_builtin: int, is_enabled: int):
+        aliases: Sequence|str|None, perms: str, count: int, is_hdden: int, is_builtin: int, is_enabled: int):
         self.chan_id = chan_id
         self.name = name
         self.message = message
@@ -69,14 +70,14 @@ class Yeetrbot:
         # self._init_built_ins()
 
         # self.register_channel(3141, 'dy', 'D_Y')
-        # self.register_command(3141, "uwu", "asoidc", perms="moderator")
-        # self.register_command(3141, "uptime", "asoidc", perms="moderator")
-        # self.register_command(3141, "adivjn", "asoidc", perms="moderator")
+        # self.update_command(3141, "uwu", "asoidc", perms="moderator")
+        # self.update_command(3141, "uptime", "asoidc", perms="moderator")
+        # self.update_command(3141, "adivjn", "asoidc", perms="moderator")
         # self.register_channel(59873, 'asdoci', 'BAR')
-        # self.register_command(59873, 'mycomm', 'mymsg')
-        # self.register_command(193457, "adivjn", "asoidc")
-        self.register_command(3141, 'testadd', 'foo', None, None, None, None, None, 'add')
-        self.register_command(3141, 'testadd', 'bar', "None", None, None, None, 0, 'edit')
+        # self.update_command(59873, 'mycomm', 'mymsg')
+        # self.update_command(193457, "adivjn", "asoidc")
+        self.update_command(3141, 'testadd', 'foo', None, None, None, None, None, 'add')
+        self.update_command(3141, 'testadd', 'bar', "None", None, None, None, 0, 'edit')
 
     @property
     def channels(self):
@@ -130,28 +131,73 @@ class Yeetrbot:
 
 
     def parse_commands_str(self, cmd: str, msg: str):
-        args = msg.split()
+        args = msg.split(' ')
         out = None
         name = message = aliases = perms = count = is_builtin = is_enabled = None
-        cmd_switch = {
-            'commands': 0,
-            'addcmd': name, 
-            'editcmd': 0,
-            'delcmd': 0,
-            'disable': 0,
-        }
+        try:
+            args.insert(0, cmd_switch[args[0]])
+        except KeyError as exc:
+            print(exc.args[0])
+        if args
+        thing = vars(parse_cmd.parse(' '.join(args)))
+
 
         pass
 
+
+@commands.command(name='cmd', aliases=('addcmd', 'editcmd', 'delcmd', 'disable', 'enable'))
+async def command_cmd(self, ctx: commands.Context):
+    msg = ctx.message.content
+    resp = None
+    cmd, action, msg = msg.split(None, 2)
+    action_switch = {
+        '!cmd': '',
+        '!addcmd': 'add',
+        '!editcmd': 'edit',
+        '!delcmd': 'delete',
+        '!disable': 'disable',
+        #'!disablecmd': 'disable',
+        '!enable': 'enable',
+    }
+
+    if cmd != '!cmd':
+        action = action_switch[cmd]
+        msg = action + msg
+    command_name = message = aliases = perms = count = is_hidden = is_builtin = is_enabled = None
+
+    try:
+        cmd_info = parse_cmd.parse(msg)
+        channel_id = ctx.channel.name
+        author = ctx.author.name
+        if action in ('edit', 'disable', 'enable'):
+            self.update_command()
+
+    except (parse_cmd.InvalidArgument, parse_cmd.InvalidSyntax) as exc:
+        resp = f"{ctx.author.mention()}: {exc.args[0]}"
+    except Exception as exc:
+        print(exc.args[0])
+        resp = f"{ctx.author.mention()}: There was an error while performing this !cmd operation."
+    finally:
+        await ctx.send(resp)
+
+
+
     '''
-    !addcmd name -a=aliases -p=perms -c=count -
+    !command <add|edit|delete|disable|enable|show|list> -r[aw]=1 <name> -a=aliases -p=perms -c=count -t=toggle -d=description(must have quotes) <message>
+    !addcmd -r[aw]=1 <name> -a=aliases -p=perms -c=count -t=toggle -d=description(must have quotes) <message>
+    !editcmd -r[aw]=1 <name> -a=aliasses -p=perms -c=count -t=toggle -n=new_name -d=description(must have quotes) <message>
+    !delcmd <name>
+    !disable <name>
+    !enable <name>
+    !showcmd <name> (displays the command's name, description and message)
+    !listcmd <count>
     '''
 
-    def _insert_new_command(self, channel_id: int, command_name: str, message: str|None, aliases: Sequence|str|None, perms: str, count: int, is_builtin: int, is_enabled: int):
-        '''Called by `register_command()`. Commits a new command to the database.'''
-        fields = ('chan_id', 'name', 'aliases', 'message', 'perms', 'count', 'is_builtin', 'is_enabled')
+    def _insert_new_command(self, channel_id: int, command_name: str, message: str|None, aliases: Sequence|str|None, perms: str, count: int, is_hidden: int, is_builtin: int, is_enabled: int):
+        '''Called by `update_command()`. Commits a new command to the database.'''
+        fields = ('chan_id', 'name', 'aliases', 'message', 'perms', 'count', 'is_hidden', 'is_builtin', 'is_enabled')
         _sql = f"insert into command({','.join(fields)}) values ({','.join(['?'] * len(fields))})"
-        vals = (channel_id, command_name, message, aliases, perms, count, is_builtin, is_enabled)
+        vals = (channel_id, command_name, message, aliases, perms, count, is_hidden, is_builtin, is_enabled)
         try:
             with self._db_conn:
                 self._db.execute(_sql, vals)
@@ -159,11 +205,15 @@ class Yeetrbot:
             raise RegistrationError(f"Failed registering command {command_name}: {exc.args[0]}")
             # print(f"Failed registering command {channel_commands[command_name]}: {exc.args[0]}")
 
-    def _update_command(self, channel_id: int, command_name: str, message: str|None, aliases: Sequence|str|None, perms: str, count: int, is_builtin: int, is_enabled: int):
-        '''Called by `register_command()`. Commits a new command to the database.'''
-        fields = ('chan_id', 'name', 'aliases', 'message', 'perms', 'count', 'is_builtin', 'is_enabled')
-        _sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))})"
-        vals = (channel_id, command_name, message, aliases, perms, count, is_builtin, is_enabled)
+    def _update_command(self, values: dict):
+    #def _update_command(self, channel_id: int, command_name: str, message: str|None, aliases: Sequence|str|None, perms: str, count: int, is_hidden: int, is_builtin: int, is_enabled: int):
+        '''Called by `update_command()`. Commits a new command to the database.'''
+        #fields = ('chan_id', 'name', 'aliases', 'message', 'perms', 'count', 'is_hidden', 'is_builtin', 'is_enabled')
+        #vals = tuple(v for v in vals.values())
+        #vals = (channel_id, command_name, message, aliases, perms, count, is_hidden, is_builtin, is_enabled)
+        #_sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))}) where (chan_id, name) = ({vals['channel_id']}, {vals['command_name']})"
+        fields, vals = ((i[0], i[1]) for i in values.items())
+        _sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))}) where (chan_id, name) = ({values['channel_id']}, {values['command_name']})"
         try:
             with self._db_conn:
                 self._db.execute(_sql, vals)
@@ -171,13 +221,12 @@ class Yeetrbot:
             raise RegistrationError(f"Failed registering command {command_name}: {exc.args[0]}")
             # print(f"Failed registering command {channel_commands[command_name]}: {exc.args[0]}")
 
-    def register_command(self, channel_id: int, command_name: str, message: str, aliases: Sequence|str|None,
-        perms: str, count: int, is_builtin: int, is_enabled: int, action: str):
-        '''Registers a custom command to the database if the channel exists and
-        the command name is unused. Otherwise raises `RegistrationError`. Assumes
-        moderator permissions.'''
-        keys = ('channel_id', 'command_name', 'message', 'aliases', 'perms', 'count', 'is_builtin', 'is_enabled')
-        vals = (channel_id, command_name, message, aliases, perms, count, is_builtin, is_enabled)
+    def update_command(self, channel_id: int, action: str, command_name: str, message: str|None, aliases: Sequence|str|None, perms: str, count: int, is_hidden: int, is_builtin: int, is_enabled: int, new_name: str):
+        '''Registers a custom command to the database if the command name is
+        unused if the channel exists. Otherwise raises `RegistrationError`.
+        Assumes moderator permissions.'''
+        keys = ('channel_id', 'command_name', 'message', 'aliases', 'perms', 'count', 'is_hidden', 'is_builtin', 'is_enabled')
+        vals = (channel_id, command_name, message, aliases, perms, count, is_hidden, is_builtin, is_enabled)
         fields = {k: v for k, v in zip(keys, vals) if v != None}
         print(fields)
         # fields = dict(zip(keys, [v for v in vals if v]))
@@ -195,6 +244,7 @@ class Yeetrbot:
                 if command_name not in channel_commands.keys():
                     raise RegistrationError(f"Command name {command_name} has not been registered.")
                 self.regd_channels[channel_id].commands[command_name].__dict__.update(fields)
+                self._update_command()
             elif action == 'add':
                 if command_name in channel_commands.keys():
                     raise RegistrationError(f"{channel_commands[command_name]} is already registered.")
