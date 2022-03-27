@@ -199,7 +199,8 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
     '''Base class for bot configs containing default commands and variables.'''
     def __init__(self):
         self._init_database()
-        self.channel_data = self._init_channels()
+        # self.channel_data = self._init_channels()
+        self._init_channels()
         self._init_commands()
         # print(self.channels)
         # self.register_channel(1234, 'foo', 'Foo')
@@ -207,7 +208,8 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         # self.register_command(1234, 'testcomm', "My new command.",)
         # self.register_command(4567, 'testcomm2', "My newer command.",)
         self.display_name = ENV['BOT_NICK']
-        print(self.channel_data)
+        # print(self.channel_data)
+        print(self.regd_channels)
         # print(self.channels)
         # print(self.com)
 
@@ -221,8 +223,8 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
             nick=ENV['BOT_NICK'],
             prefix=ENV['BOT_PREFIX'],
             # prefix='!',
-            # initial_channels=ENV['INITIAL_CHANNELS'] # + self.channels
-            initial_channels=self.channels
+            initial_channels=ENV['INITIAL_CHANNELS'] # + self.channels
+            # initial_channels=self.channels
             )
         # self.channels = ENV['INITIAL_CHANNELS']
 
@@ -290,6 +292,9 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
 
     @commands.command(name='cmd', aliases=('addcmd', 'editcmd', 'delcmd', 'disable', 'enable'))
     async def command_cmd(self, ctx: commands.Context):
+        # print("!cmd was called by", ctx.author.id)
+        # print(type(ctx.author.id))
+        # print(self.regd_channels[ctx.author.id].commands)
         msg = ctx.message.content
         resp = None
         cmd, action, msg = msg.split(None, 2)
@@ -305,12 +310,18 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
 
         if cmd != '!cmd':
             action = action_switch[cmd]
-            msg = action + msg
+            # msg = action + msg
         # command_name = message = aliases = perms = count = is_hidden = is_builtin = is_enabled = None
+        # msg = action + ' ' + msg
 
         try:
-            parsed = parse_cmd.parse(msg)
-            channel = ctx.channel.user()
+            print(cmd)
+            print(msg)
+            print(action)
+            parsed = parse_cmd.parse(action + ' ' + msg)
+            print(f"{type(parsed)=}")
+            channel = await ctx.channel.user()
+            # print(type(channel.id))
             if isinstance(parsed, tuple):
                 cmd_info, message = parsed
             elif not parsed:
@@ -319,24 +330,34 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
                 cmd_info = parsed
                 message = None
             cmd_info = vars(cmd_info)
+            print(f"{type(cmd_info)=}")
+            # print(f"{type(self.regd_channels)=}")
+            print(vars(self.regd_channels[436164774]))
             cmd_info['message'] = message
             cmd_info['channel_id'] = channel.id
-            cmd_info['author_name'] = ctx.author.name
+            cmd_info['author_name'] = int(ctx.author.id)
+            # print(type(ctx.author.id))
             if action in ('add', 'edit', 'disable', 'enable'):
-                self._update_command(cmd_info)
+                self._update_command(action, cmd_info)
 
-        except RegistrationError as exc:
-            resp = f"{ctx.author.mention()}: {exc.args[0]}"
+        except base_classes.RegistrationError as exc:
+            resp = f"{ctx.author.mention}: {exc.args[0]}"
         except (parse_cmd.InvalidArgument, parse_cmd.InvalidSyntax) as exc:
-            resp = f"{ctx.author.mention()}: {exc.args[0]}"
-        except TypeError as exc:
-            print(exc.args[0])
-            resp = f"{ctx.author.mention()}: TypeError: {exc}"
-        except Exception as exc:
-            print(exc.args[0])
-            resp = f"{ctx.author.mention()}: There was an error while performing this !cmd operation."
-        finally:
-            await ctx.send(resp)
+            resp = f"{ctx.author.mention}: {exc.args[0]}"
+        # except parse_cmd.InvalidArgument as exc:
+        #     resp = f"{ctx.author.mention}: {exc.args[0]}"
+        # except parse_cmd.InvalidSyntax as exc:
+        #     resp = f"{ctx.author.mention}: {exc.args[0]}"
+        # except TypeError as exc:
+            # print(exc.args[0])
+            # resp = f"{ctx.author.mention}: TypeError: {exc}"
+        # except Exception as exc:
+            # print(type(exc))
+            # print(exc.with_traceback())
+            # resp = f"{ctx.author.mention}: There was an error while performing this !cmd operation."
+        # finally:
+            # await ctx.send(resp)
+        await ctx.send(resp)
 
 
 
@@ -387,17 +408,19 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         if msg:
             await ctx.send(f"{ctx.author.mention}, the !join command must be blank.")
             return
-        uid = ctx.author.id
+        uid = int(ctx.author.id)
         username = ctx.author.name
         display_name = ctx.author.display_name
-        if uid not in self.channel_data:
+        # if uid not in self.channel_data:
+        if uid not in self.regd_channels:
             try:
                 self.register_channel(uid, username, display_name)
                 await self.join_channels([username])
                 await ctx.send(f"{ctx.author.mention}, I have successfully joined your channel. See you there!")
                 # self.db.execute("commit")
                 # print("ran !join")
-                print(self.channel_data)
+                # print(self.channel_data)
+                print(self.regd_channels)
             except Exception as exc:
                 print(exc.args[0])
                 await ctx.send(f"""{ctx.author.mention}, I encountered an

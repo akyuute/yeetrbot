@@ -37,9 +37,10 @@ class RegisteredChannel:
 
 class RegisteredCommand:
     def __init__(self, channel_id: int, name: str, values: dict):
+        self.__dict__ = values
         self.channel_id = channel_id
         self.name = name
-        self.__dict__ = values
+        perms = values['perms']
     # def __init__(self, channel_id: int, name: str, message: str|None,
     #     aliases: Sequence|str|None, perms: str, count: int, is_hidden: int, is_builtin: int, is_enabled: int, author_name:str):
     #     self.channel_id = channel_id
@@ -65,11 +66,6 @@ class Yeetrbot:
     '''Contains methods for database exchanges and additional functionality.'''
     channel_data: dict
     def __init__(self):
-        self._built_ins = {k: v for k, v in built_in_commands.__dict__.items() if isinstance(v, Callable)}
-        self.built_ins = [f.__name__ for f in self._built_ins.values() if not f.__name__.startswith('_')]
-        self._defaults = {k: v for k, v in default_commands.__dict__.items() if isinstance(v, Callable)}
-        self.defaults = [f.__name__ for f in self._defaults.values() if not f.__name__.startswith('_')]
-
         self._init_database()
         self._init_channels()
         self._init_commands()
@@ -98,6 +94,11 @@ class Yeetrbot:
         with self._db_conn:
             for stmt in _create_tables:
                 self._db.execute(stmt)
+        self._built_ins = {k: v for k, v in built_in_commands.__dict__.items() if isinstance(v, Callable)}
+        self.built_ins = [f.__name__ for f in self._built_ins.values() if not f.__name__.startswith('_')]
+        self._defaults = {k: v for k, v in default_commands.__dict__.items() if isinstance(v, Callable)}
+        self.defaults = [f.__name__ for f in self._defaults.values() if not f.__name__.startswith('_')]
+
 
     def _init_channels(self):
         '''Retrieves channel records from the database and initializes a
@@ -169,10 +170,10 @@ class Yeetrbot:
         #fields = ('channel_id', 'name', 'aliases', 'message', 'perms', 'count', 'is_hidden', 'is_builtin', 'is_enabled')
         #vals = tuple(v for v in vals.values())
         #vals = (channel_id, command_name, message, aliases, perms, count, is_hidden, is_builtin, is_enabled)
-        #_sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))}) where (channel_id, name) = ({vals['channel_id']}, {vals['command_name']})"
+        #_sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))}) where (channel_id, name) = ({vals['channel_id']}, {vals['name']})"
 
         # fields, vals = ((i[0], i[1]) for i in values.items())
-        # _sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))}) where (channel_id, name) = ({values['channel_id']}, {values['command_name']})"
+        # _sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))}) where (channel_id, name) = ({values['channel_id']}, {values['name']})"
         # try:
         #     with self._db_conn:
         #         self._db.execute(_sql, vals)
@@ -182,16 +183,17 @@ class Yeetrbot:
 
 
     # def update_command(self, channel_id: int, action: str, command_name: str, message: str|None, aliases: Sequence|str|None, perms: str, count: int, is_hidden: int, is_builtin: int, is_enabled: int, new_name: str):
-    def _update_command(self, values: dict, ):
+    def _update_command(self, action, values: dict, ):
         '''Registers a custom command to the database if the command name is
         unused if the channel exists. Otherwise raises `RegistrationError`.
         Assumes moderator permissions.'''
 
         channel_id = values['channel_id']
-        command_name = values['command_name']
+        command_name = values['name'][0]
         if channel_id not in self.regd_channels.keys():
             raise RegistrationError(f"Channel with id {channel_id} is not registered.")
         channel_commands = self.regd_channels[channel_id].commands
+        print(f"{type(channel_commands)}")
         # if command_name in self.built_ins:
         #     raise RegistrationError(f"Command name {command_name!r} conflicts with a built-in command with the same name.")
         if command_name in self.defaults:
@@ -215,10 +217,10 @@ class Yeetrbot:
             update_dict = dict(*(i for i in values.items() if i[1] != None))
             fields, vals = ((i[0], i[1]) for i in update_dict.items())
             self.regd_channels[channel_id].commands[command_name].__dict__.update(fields)
-            self._update_command()
+            # self._update_command()
 
             try:
-                _sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))}) where (channel_id, name) = ({values['channel_id']}, {values['command_name']})"
+                _sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))}) where (channel_id, name) = ({values['channel_id']}, {values['name']})"
                 with self._db_conn:
                     self._db.execute(_sql, vals)
             except sqlite3.IntegrityError as exc:

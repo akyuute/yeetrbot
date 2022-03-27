@@ -22,6 +22,7 @@ create table if not exists chatter (
 , """
 create table if not exists channel (
     id integer primary key
+    -- id text primary key
     , name text unique not null
     , display_name text unique not null
     , history text

@@ -7,7 +7,7 @@ subparsers = parser.add_subparsers(help="Help for all subcommands here.")
 cmd_add_or_edit = subparsers.add_parser('!cmd', add_help=False)
 cmd_add_or_edit.set_defaults(is_enabled=None)
 
-cmd_add_or_edit.add_argument('command', nargs=1)
+cmd_add_or_edit.add_argument('name', nargs=1)
 cmd_add_or_edit.add_argument('--perms', '-p', choices="everyone rank= moderator vip owner".split())
 cmd_add_or_edit.add_argument('--aliases', '-a', nargs=1)
 cmd_add_or_edit.add_argument('--count', '-c', type=int)
@@ -29,7 +29,7 @@ cmd_edit.add_argument('--rename', '-r', nargs=1, default=None, dest='new_name')
 cmd_add_or_edit.add_argument('--enable', '-e', action='store_const', const=1, default=None, dest='is_enabled')
 
 other_cmd_actions = subparsers.add_parser('!cmd', add_help=False)
-other_cmd_actions.add_argument('command', nargs='+')
+other_cmd_actions.add_argument('name', nargs='+')
 
 cmd_delete = subparsers.add_parser('delete', parents=[other_cmd_actions], aliases=('remove',), exit_on_error=False, description="Delete commands.", help="Multiple commands may be deleted at once.")
 cmd_disable = subparsers.add_parser('disable', parents=[other_cmd_actions], exit_on_error=False, description="Disable commands.", help="Multiple commands may be disabled at once.")
@@ -47,7 +47,7 @@ def parse(msg: str, parser: argparse.ArgumentParser = parser):
     if len(args) < 3:
         if '-h' in args or '--help' in args:
             return parser.print_help()
-        return f"Syntax Error: Not enough arguments. <!cmd syntax info>"
+        raise InvalidSyntax("Syntax Error: Not enough arguments. <!cmd syntax info>")
     num_parsed = 1
     last_result: argparse.Namespace = None
     valid_flags = ('--help', '-h', '--permissions', '-p', '--aliases', '-a', '--count', '-c', '--hide', '-i', '--disable', '-d',  )
@@ -73,7 +73,7 @@ def parse(msg: str, parser: argparse.ArgumentParser = parser):
                 break
             # If not a legitimate command name, catch this as an invalid arg:
             if i > 2:
-                return InvalidArgument(f"Invalid argument: {args[i]!r}")
+                raise InvalidArgument(f"Invalid argument: {args[i]!r}")
 
         except argparse.ArgumentError as exc:
             # If the command lacks a message, begins with anything that can be interpreted
@@ -81,7 +81,7 @@ def parse(msg: str, parser: argparse.ArgumentParser = parser):
             #if args[i] not in valid_flags:
             #i == len(args) - 1
             if i == len(args) - 1 or args[i] not in valid_flags:
-                return InvalidArgument(f"Syntax error: {exc}")
+                raise InvalidArgument(f"Syntax error: {exc}")
             num_parsed += 1
 
     if not last_result:
