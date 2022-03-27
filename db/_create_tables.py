@@ -32,10 +32,10 @@ create table if not exists channel (
 create table if not exists user_presence (
     id integer unique not null
     , user_id integer not null
-    , chan_id integer not null
-    , primary key(user_id, chan_id)
+    , channel_id integer not null
+    , primary key(user_id, channel_id)
     , foreign key(user_id) references chatter(id)
-    , foreign key(chan_id) references channel(id)
+    , foreign key(channel_id) references channel(id)
 );
 """
 
@@ -60,10 +60,10 @@ create table if not exists variable (
 ,"""
 create table if not exists chan_var (
     id integer primary key
-    , chan_id integer not null
+    , channel_id integer not null
     , var_id integer not null
     , value text
-    , foreign key(chan_id) references channel(id)
+    , foreign key(channel_id) references channel(id)
     , foreign key(var_id) references variable(id)
 );
 """
@@ -83,7 +83,7 @@ create table if not exists user_var (
 
 create table if not exists command (
     id integer primary key
-    , chan_id integer not null
+    , channel_id integer not null
     , name text unique not null
     , message text
     , aliases text
@@ -96,7 +96,7 @@ create table if not exists command (
     , modified_by text
     , ctime text not null
     , mtime text not null
-    , foreign key(chan_id) references channel(id)
+    , foreign key(channel_id) references channel(id)
 );
 """
 

@@ -36,19 +36,25 @@ class RegisteredChannel:
         # return str(self.username)
 
 class RegisteredCommand:
-    def __init__(self, chan_id: int, name: str, message: str|None,
-        aliases: Sequence|str|None, perms: str, count: int, is_hdden: int, is_builtin: int, is_enabled: int):
-        self.chan_id = chan_id
+    def __init__(self, channel_id: int, name: str, values: dict):
+        self.channel_id = channel_id
         self.name = name
-        self.message = message
-        self.aliases = aliases
-        self.perms = perms
-        self.count = count
-        self.is_builtin = is_builtin
-        self.is_enabled = is_enabled
+        self.__dict__ = values
+    # def __init__(self, channel_id: int, name: str, message: str|None,
+    #     aliases: Sequence|str|None, perms: str, count: int, is_hidden: int, is_builtin: int, is_enabled: int, author_name:str):
+    #     self.channel_id = channel_id
+    #     self.name = name
+    #     self.message = message
+    #     self.aliases = aliases
+    #     self.perms = perms
+    #     self.count = count
+    #     self.is_hidden = is_hidden
+    #     self.is_builtin = is_builtin
+    #     self.is_enabled = is_enabled
+    #     self.author_name = author_name
 
         # self._repr = str(self.__class__)
-        self._repr = f"<RegisteredCommand({name=}, {perms=}, {chan_id=})>"
+        self._repr = f"<RegisteredCommand({name=}, {perms=}, {channel_id=})>"
 
     def __repr__(self) -> str:
         return self._repr
@@ -76,8 +82,8 @@ class Yeetrbot:
         # self.register_channel(59873, 'asdoci', 'BAR')
         # self.update_command(59873, 'mycomm', 'mymsg')
         # self.update_command(193457, "adivjn", "asoidc")
-        self.update_command(3141, 'testadd', 'foo', None, None, None, None, None, 'add')
-        self.update_command(3141, 'testadd', 'bar', "None", None, None, None, 0, 'edit')
+        self._update_command(3141, 'testadd', 'foo', None, None, None, None, None, 'add')
+        self._update_command(3141, 'testadd', 'bar', "None", None, None, None, 0, 'edit')
 
     @property
     def channels(self):
@@ -99,18 +105,18 @@ class Yeetrbot:
         records = self._db.execute("select * from channel")
         self.regd_channels = {}
         for record in records:
-            chan_id = record[0]
-            self.regd_channels[chan_id] = RegisteredChannel(*record)
+            channel_id = record[0]
+            self.regd_channels[channel_id] = RegisteredChannel(*record)
 
     def _init_commands(self):
         '''Retrieves command records from the database and initializes a
         `RegisteredCommand` object for each.'''
-        fields = ('chan_id', 'name', 'aliases', 'message', 'perms', 'count', 'is_builtin', 'is_enabled')
+        fields = ('channel_id', 'name', 'aliases', 'message', 'perms', 'count', 'is_builtin', 'is_enabled')
         _sql = f"select {','.join(fields)} from command" # where is_builtin = 0"
         records = self._db.execute(_sql)
         for record in records:
             command = RegisteredCommand(*record)
-            self.regd_channels[command.chan_id].commands[command.name] = command
+            self.regd_channels[command.channel_id].commands[command.name] = command
 
     def register_channel(self, user_id: int, username: str, display_name: str, **vars):
         '''Registers a channel to the database if new, otherwise raises
@@ -130,133 +136,93 @@ class Yeetrbot:
                 # print(f"Failed registering channel {username}: {exc.args[0]}")
 
 
-    def parse_commands_str(self, cmd: str, msg: str):
-        args = msg.split(' ')
-        out = None
-        name = message = aliases = perms = count = is_builtin = is_enabled = None
-        try:
-            args.insert(0, cmd_switch[args[0]])
-        except KeyError as exc:
-            print(exc.args[0])
-        if args
-        thing = vars(parse_cmd.parse(' '.join(args)))
+    # def parse_commands_str(self, cmd: str, msg: str):
+    #     args = msg.split(' ')
+    #     out = None
+    #     name = message = aliases = perms = count = is_builtin = is_enabled = None
+    #     try:
+    #         args.insert(0, cmd_switch[args[0]])
+    #     except KeyError as exc:
+    #         print(exc.args[0])
+    #     if args
+    #     thing = vars(parse_cmd.parse(' '.join(args)))
 
 
-        pass
+    #     pass
 
 
-@commands.command(name='cmd', aliases=('addcmd', 'editcmd', 'delcmd', 'disable', 'enable'))
-async def command_cmd(self, ctx: commands.Context):
-    msg = ctx.message.content
-    resp = None
-    cmd, action, msg = msg.split(None, 2)
-    action_switch = {
-        '!cmd': '',
-        '!addcmd': 'add',
-        '!editcmd': 'edit',
-        '!delcmd': 'delete',
-        '!disable': 'disable',
-        #'!disablecmd': 'disable',
-        '!enable': 'enable',
-    }
+    # def _insert_new_command(self, channel_id: int, command_name: str, message: str|None, aliases: Sequence|str|None, perms: str, count: int, is_hidden: int, is_builtin: int, is_enabled: int):
+    #     '''Called by `update_command()`. Commits a new command to the database.'''
+    #     fields = ('channel_id', 'name', 'aliases', 'message', 'perms', 'count', 'is_hidden', 'is_builtin', 'is_enabled')
+    #     _sql = f"insert into command({','.join(fields)}) values ({','.join(['?'] * len(fields))})"
+    #     vals = (channel_id, command_name, message, aliases, perms, count, is_hidden, is_builtin, is_enabled)
+    #     try:
+    #         with self._db_conn:
+    #             self._db.execute(_sql, vals)
+    #     except sqlite3.IntegrityError as exc:
+    #         raise RegistrationError(f"Failed registering command {command_name}: {exc.args[0]}")
+    #         # print(f"Failed registering command {channel_commands[command_name]}: {exc.args[0]}")
 
-    if cmd != '!cmd':
-        action = action_switch[cmd]
-        msg = action + msg
-    command_name = message = aliases = perms = count = is_hidden = is_builtin = is_enabled = None
-
-    try:
-        cmd_info = parse_cmd.parse(msg)
-        channel_id = ctx.channel.name
-        author = ctx.author.name
-        if action in ('edit', 'disable', 'enable'):
-            self.update_command()
-
-    except (parse_cmd.InvalidArgument, parse_cmd.InvalidSyntax) as exc:
-        resp = f"{ctx.author.mention()}: {exc.args[0]}"
-    except Exception as exc:
-        print(exc.args[0])
-        resp = f"{ctx.author.mention()}: There was an error while performing this !cmd operation."
-    finally:
-        await ctx.send(resp)
-
-
-
-    '''
-    !command <add|edit|delete|disable|enable|show|list> -r[aw]=1 <name> -a=aliases -p=perms -c=count -t=toggle -d=description(must have quotes) <message>
-    !addcmd -r[aw]=1 <name> -a=aliases -p=perms -c=count -t=toggle -d=description(must have quotes) <message>
-    !editcmd -r[aw]=1 <name> -a=aliasses -p=perms -c=count -t=toggle -n=new_name -d=description(must have quotes) <message>
-    !delcmd <name>
-    !disable <name>
-    !enable <name>
-    !showcmd <name> (displays the command's name, description and message)
-    !listcmd <count>
-    '''
-
-    def _insert_new_command(self, channel_id: int, command_name: str, message: str|None, aliases: Sequence|str|None, perms: str, count: int, is_hidden: int, is_builtin: int, is_enabled: int):
-        '''Called by `update_command()`. Commits a new command to the database.'''
-        fields = ('chan_id', 'name', 'aliases', 'message', 'perms', 'count', 'is_hidden', 'is_builtin', 'is_enabled')
-        _sql = f"insert into command({','.join(fields)}) values ({','.join(['?'] * len(fields))})"
-        vals = (channel_id, command_name, message, aliases, perms, count, is_hidden, is_builtin, is_enabled)
-        try:
-            with self._db_conn:
-                self._db.execute(_sql, vals)
-        except sqlite3.IntegrityError as exc:
-            raise RegistrationError(f"Failed registering command {command_name}: {exc.args[0]}")
-            # print(f"Failed registering command {channel_commands[command_name]}: {exc.args[0]}")
-
-    def _update_command(self, values: dict):
-    #def _update_command(self, channel_id: int, command_name: str, message: str|None, aliases: Sequence|str|None, perms: str, count: int, is_hidden: int, is_builtin: int, is_enabled: int):
-        '''Called by `update_command()`. Commits a new command to the database.'''
-        #fields = ('chan_id', 'name', 'aliases', 'message', 'perms', 'count', 'is_hidden', 'is_builtin', 'is_enabled')
+    # def _update_command(self, values: dict):
+    # # def _update_command(self, channel_id: int, command_name: str, message: str|None, aliases: Sequence|str|None, perms: str, count: int, is_hidden: int, is_builtin: int, is_enabled: int):
+        # '''Called by `update_command()`. Commits a new command to the database.'''
+        #fields = ('channel_id', 'name', 'aliases', 'message', 'perms', 'count', 'is_hidden', 'is_builtin', 'is_enabled')
         #vals = tuple(v for v in vals.values())
         #vals = (channel_id, command_name, message, aliases, perms, count, is_hidden, is_builtin, is_enabled)
-        #_sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))}) where (chan_id, name) = ({vals['channel_id']}, {vals['command_name']})"
-        fields, vals = ((i[0], i[1]) for i in values.items())
-        _sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))}) where (chan_id, name) = ({values['channel_id']}, {values['command_name']})"
-        try:
-            with self._db_conn:
-                self._db.execute(_sql, vals)
-        except sqlite3.IntegrityError as exc:
-            raise RegistrationError(f"Failed registering command {command_name}: {exc.args[0]}")
-            # print(f"Failed registering command {channel_commands[command_name]}: {exc.args[0]}")
+        #_sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))}) where (channel_id, name) = ({vals['channel_id']}, {vals['command_name']})"
 
-    def update_command(self, channel_id: int, action: str, command_name: str, message: str|None, aliases: Sequence|str|None, perms: str, count: int, is_hidden: int, is_builtin: int, is_enabled: int, new_name: str):
+        # fields, vals = ((i[0], i[1]) for i in values.items())
+        # _sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))}) where (channel_id, name) = ({values['channel_id']}, {values['command_name']})"
+        # try:
+        #     with self._db_conn:
+        #         self._db.execute(_sql, vals)
+        # except sqlite3.IntegrityError as exc:
+        #     raise RegistrationError(f"Failed registering command {command_name}: {exc.args[0]}")
+        #     # print(f"Failed registering command {channel_commands[command_name]}: {exc.args[0]}")
+
+
+    # def update_command(self, channel_id: int, action: str, command_name: str, message: str|None, aliases: Sequence|str|None, perms: str, count: int, is_hidden: int, is_builtin: int, is_enabled: int, new_name: str):
+    def _update_command(self, values: dict, ):
         '''Registers a custom command to the database if the command name is
         unused if the channel exists. Otherwise raises `RegistrationError`.
         Assumes moderator permissions.'''
-        keys = ('channel_id', 'command_name', 'message', 'aliases', 'perms', 'count', 'is_hidden', 'is_builtin', 'is_enabled')
-        vals = (channel_id, command_name, message, aliases, perms, count, is_hidden, is_builtin, is_enabled)
-        fields = {k: v for k, v in zip(keys, vals) if v != None}
-        print(fields)
-        # fields = dict(zip(keys, [v for v in vals if v]))
+
+        channel_id = values['channel_id']
+        command_name = values['command_name']
         if channel_id not in self.regd_channels.keys():
             raise RegistrationError(f"Channel with id {channel_id} is not registered.")
         channel_commands = self.regd_channels[channel_id].commands
-        if command_name in self.built_ins:
-            raise RegistrationError(f"Command name {command_name!r} conflicts with a built-in command with the same name.")
-        elif command_name in self.defaults:
+        # if command_name in self.built_ins:
+        #     raise RegistrationError(f"Command name {command_name!r} conflicts with a built-in command with the same name.")
+        if command_name in self.defaults:
             raise RegistrationError(f"Command name {command_name!r} conflicts with a default command with the same name.")
-        # elif command_name in self.built_ins and not message:
-            # pass
-        else:
-            if action == 'edit':
-                if command_name not in channel_commands.keys():
-                    raise RegistrationError(f"Command name {command_name} has not been registered.")
-                self.regd_channels[channel_id].commands[command_name].__dict__.update(fields)
-                self._update_command()
-            elif action == 'add':
-                if command_name in channel_commands.keys():
-                    raise RegistrationError(f"{channel_commands[command_name]} is already registered.")
 
-                is_enabled = 1 if not None else is_enabled
+        if action == 'add':
+            if command_name in channel_commands.keys():
+                raise RegistrationError(f"{channel_commands[command_name]} is already registered.")
+            self.regd_channels[channel_id].commands[command_name] = RegisteredCommand(channel_id, command_name, values)
+            fields, vals = ((i[0], i[1]) for i in values.items())
+            _sql = f"insert into command({','.join(fields)}) values ({','.join(['?'] * len(fields))})"
+            try:
+                with self._db_conn:
+                    self._db.execute(_sql, vals)
+            except sqlite3.IntegrityError as exc:
+                raise RegistrationError(f"Failed registering command {command_name}: {exc.args[0]}")
 
-                self.regd_channels[channel_id].commands[command_name] = RegisteredCommand(*vals)
-                # fields['is_enabled'] = is_enabled if is_enabled else 1
-                # new_dict = {k: v for k, v in fields.items() if v != None}
-                # print(new_dict)
-                # self._insert_new_command(*vals)
+        elif action == 'edit':
+            if command_name not in channel_commands.keys():
+                raise RegistrationError(f"Command name {command_name} has not been registered.")
+            update_dict = dict(*(i for i in values.items() if i[1] != None))
+            fields, vals = ((i[0], i[1]) for i in update_dict.items())
+            self.regd_channels[channel_id].commands[command_name].__dict__.update(fields)
+            self._update_command()
 
+            try:
+                _sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))}) where (channel_id, name) = ({values['channel_id']}, {values['command_name']})"
+                with self._db_conn:
+                    self._db.execute(_sql, vals)
+            except sqlite3.IntegrityError as exc:
+                raise RegistrationError(f"Failed registering command {command_name}: {exc.args[0]}")
 
 
 

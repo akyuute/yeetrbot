@@ -11,6 +11,8 @@ import csv
 import atexit
 # from os import environ
 from dotenv import load_dotenv
+import parse_cmd
+import base_classes
 from my_commands import string_commands
 # from my_commands.string_commands import derp, uwu, uhm
 #from alpha.eng_funcs import EngFuncs as eng
@@ -192,13 +194,13 @@ class Yeetrbot:
         pass
 
 
-class ChatBot(commands.Bot, Yeetrbot):
+# class ChatBot(commands.Bot, Yeetrbot):
+class ChatBot(commands.Bot, base_classes.Yeetrbot):
     '''Base class for bot configs containing default commands and variables.'''
     def __init__(self):
         self._init_database()
-        self.channel_data = self._fetch_channel_data()
-        self._fetch_commands()
-        self._fetch_built_ins()
+        self.channel_data = self._init_channels()
+        self._init_commands()
         # print(self.channels)
         # self.register_channel(1234, 'foo', 'Foo')
         # self.register_channel(4567, 'bar', 'Bar')
@@ -284,6 +286,58 @@ class ChatBot(commands.Bot, Yeetrbot):
         # Since we have commands and are overriding the default `event_message`
         # We must let the bot know we want to handle and invoke our commands...
         await self.handle_commands(message)
+
+
+    @commands.command(name='cmd', aliases=('addcmd', 'editcmd', 'delcmd', 'disable', 'enable'))
+    async def command_cmd(self, ctx: commands.Context):
+        msg = ctx.message.content
+        resp = None
+        cmd, action, msg = msg.split(None, 2)
+        action_switch = {
+            '!cmd': '',
+            '!addcmd': 'add',
+            '!editcmd': 'edit',
+            '!delcmd': 'delete',
+            '!disable': 'disable',
+            #'!disablecmd': 'disable',
+            '!enable': 'enable',
+        }
+
+        if cmd != '!cmd':
+            action = action_switch[cmd]
+            msg = action + msg
+        # command_name = message = aliases = perms = count = is_hidden = is_builtin = is_enabled = None
+
+        try:
+            parsed = parse_cmd.parse(msg)
+            channel = ctx.channel.user()
+            if isinstance(parsed, tuple):
+                cmd_info, message = parsed
+            elif not parsed:
+                raise TypeError("Parser returned NoneType, most likely resulting from a --help flag.")
+            else:
+                cmd_info = parsed
+                message = None
+            cmd_info = vars(cmd_info)
+            cmd_info['message'] = message
+            cmd_info['channel_id'] = channel.id
+            cmd_info['author_name'] = ctx.author.name
+            if action in ('add', 'edit', 'disable', 'enable'):
+                self._update_command(cmd_info)
+
+        except RegistrationError as exc:
+            resp = f"{ctx.author.mention()}: {exc.args[0]}"
+        except (parse_cmd.InvalidArgument, parse_cmd.InvalidSyntax) as exc:
+            resp = f"{ctx.author.mention()}: {exc.args[0]}"
+        except TypeError as exc:
+            print(exc.args[0])
+            resp = f"{ctx.author.mention()}: TypeError: {exc}"
+        except Exception as exc:
+            print(exc.args[0])
+            resp = f"{ctx.author.mention()}: There was an error while performing this !cmd operation."
+        finally:
+            await ctx.send(resp)
+
 
 
     @commands.command(name="testmsg")
@@ -603,7 +657,7 @@ print("Registered channels:", mybot.channels)
 
 prepare_bot(bot=mybot, cogs=(StrCommands(mybot), EventsCog(mybot), MiscCommandsCog(mybot)))
 # mybot.remove_command("join")
-mybot.db_conn.commit()
+mybot._db_conn.commit()
 mybot.run()
 
 
