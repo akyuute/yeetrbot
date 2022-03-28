@@ -13,6 +13,7 @@ cmd_add_or_edit.add_argument('--aliases', '-a', nargs=1)
 cmd_add_or_edit.add_argument('--count', '-c', type=int)
 cmd_add_or_edit.add_argument('--hide', '-i', action='store_const', const=0, default=None, dest='is_hidden')
 cmd_add_or_edit.add_argument('--disable', '-d', action='store_const', const=0, default=None, dest='is_enabled')
+cmd_add_or_edit.add_argument('--override_builtin', '-f', action='store_true', default=None)
 # cmd_add_or_edit.add_argument('--invisible', '-i', action='store_true', dest='is_hidden')
 
 cmd_add = subparsers.add_parser('add', parents=[cmd_add_or_edit], exit_on_error=False, description="Add a new custom command.", help="ADD HELP")
@@ -44,7 +45,7 @@ def parse(msg: str, parser: argparse.ArgumentParser = parser):
     '''Parses a !cmd add or !cmd edit command
     and returns new data and message.'''
     args = msg.split()
-    if len(args) < 3:
+    if len(args) < 2:
         if '-h' in args or '--help' in args:
             return parser.print_help()
         raise InvalidSyntax("Syntax Error: Not enough arguments. <!cmd syntax info>")

@@ -68,8 +68,8 @@ class Yeetrbot:
         '''Retrieves the registered custom commands for each channel
         and stores them in the channel_data dict.'''
         keys = ('chan_id', 'name', 'aliases', 'message', 'perms', 'count', 'is_enabled')
-        # records = self.db.execute("select * from command where is_builtin = 0")
-        records = self.db.execute(f"select {','.join(keys)} from command where is_builtin = 0")
+        # records = self.db.execute("select * from command where override_builtin = 0")
+        records = self.db.execute(f"select {','.join(keys)} from command where override_builtin = 0")
         # custom_commands = {int(rec[2]): {k: v for k, v in zip(keys, rec)} for rec in records}
         custom_commands = [{k: v for k, v in zip(keys, rec)} for rec in records]
         # print(custom_commands)
@@ -93,7 +93,7 @@ class Yeetrbot:
         '''Retrieves the registered built-in commands for each channel
         and stores them in the channel_data dict.'''
         keys = ('chan_id', 'name', 'aliases', 'perms', 'count', 'is_enabled')
-        records = self.db.execute(f"select {','.join(keys)} from command where is_builtin = 1")
+        records = self.db.execute(f"select {','.join(keys)} from command where override_builtin = 1")
         # builtins = {int(rec[1]): {k: v for k, v in zip(keys, rec)} for rec in records}
         built_ins = [{k: v for k, v in zip(keys, rec)} for rec in records]
         try:
@@ -132,7 +132,7 @@ class Yeetrbot:
     def register_command(self, channel_user_id: int, command_name: str, message: str, aliases: str = None, perms: str = 'everyone', count: int = None):
         if not channel_user_id in self.channel_data:
             return RegistrationError("This channel is not registered.")
-        keys = ('chan_id', 'name', 'aliases', 'message', 'perms', 'count', 'is_builtin', 'is_enabled')
+        keys = ('chan_id', 'name', 'aliases', 'message', 'perms', 'count', 'override_builtin', 'is_enabled')
         new_dict = {k: v for k, v in zip(keys, [channel_user_id, command_name, aliases, message, perms, count, 0, 1])}
         try:
             isinstance(self.channel_data[channel_user_id]['commands'], dict)
@@ -141,7 +141,7 @@ class Yeetrbot:
         finally:
             self.channel_data[channel_user_id]['commands'][command_name] = new_dict
 
-        _sql = "insert into command(chan_id, name, aliases, message, perms, count, is_builtin, is_enabled) values (?,?,?,?,?,?,?,?)"
+        _sql = "insert into command(chan_id, name, aliases, message, perms, count, override_builtin, is_enabled) values (?,?,?,?,?,?,?,?)"
         # print([str([*new_dict.values()])])
         # if command_name not in self.channel_data[channel_user_id]['commands']:
         try:
@@ -166,7 +166,7 @@ class Yeetrbot:
         finally:
             self.channel_data[channel_user_id]['commands'][command_name] = new_dict
 
-        _sql = "insert into command(chan_id, name, aliases, message, perms, count, is_builtin, is_enabled) values (?,?,?,?,?,?,?,?)"
+        _sql = "insert into command(chan_id, name, aliases, message, perms, count, override_builtin, is_enabled) values (?,?,?,?,?,?,?,?)"
         # print([str([*new_dict.values()])])
         # if command_name not in self.channel_data[channel_user_id]['commands']:
         try:
@@ -295,9 +295,11 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         # print("!cmd was called by", ctx.author.id)
         # print(type(ctx.author.id))
         # print(self.regd_channels[ctx.author.id].commands)
-        msg = ctx.message.content
-        resp = None
-        cmd, action, msg = msg.split(None, 2)
+        cmd, msg = ctx.message.content.split(None, 1)
+        print(msg)
+        resp = ""
+        # cmd, action, msg = msg.split(None, 1)
+        print(msg.split)
         action_switch = {
             '!cmd': '',
             '!addcmd': 'add',
@@ -308,18 +310,18 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
             '!enable': 'enable',
         }
 
-        if cmd != '!cmd':
-            action = action_switch[cmd]
-            # msg = action + msg
-        # command_name = message = aliases = perms = count = is_hidden = is_builtin = is_enabled = None
-        # msg = action + ' ' + msg
+        action = action_switch[cmd]
+        if cmd == '!cmd':
+            action, msg = msg.split(None, 1)
+        # command_name = message = aliases = perms = count = is_hidden = override_builtin = is_enabled = None
 
         try:
-            print(cmd)
-            print(msg)
-            print(action)
-            parsed = parse_cmd.parse(action + ' ' + msg)
-            print(f"{type(parsed)=}")
+            print(f"{cmd=}")
+            print(f"{action=}")
+            print(f"{msg=}")
+            parsed = parse_cmd.parse(msg=(action + ' ' + msg))
+            # print(f"{type(parsed)=}")
+            print(f"{parsed=}")
             channel = await ctx.channel.user()
             # print(type(channel.id))
             if isinstance(parsed, tuple):
@@ -330,20 +332,18 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
                 cmd_info = parsed
                 message = None
             cmd_info = vars(cmd_info)
-            print(f"{type(cmd_info)=}")
-            # print(f"{type(self.regd_channels)=}")
-            print(vars(self.regd_channels[436164774]))
             cmd_info['message'] = message
             cmd_info['channel_id'] = channel.id
-            cmd_info['author_name'] = int(ctx.author.id)
+            cmd_info['author_id'] = int(ctx.author.id)
             # print(type(ctx.author.id))
+            # print(self.regd_channels[channel.id].commands['!foo'])
             if action in ('add', 'edit', 'disable', 'enable'):
-                self._update_command(action, cmd_info)
+                resp = self._update_command(action, cmd_info)
 
         except base_classes.RegistrationError as exc:
-            resp = f"{ctx.author.mention}: {exc.args[0]}"
+            resp = exc.args[0]
         except (parse_cmd.InvalidArgument, parse_cmd.InvalidSyntax) as exc:
-            resp = f"{ctx.author.mention}: {exc.args[0]}"
+            resp = exc.args[0]
         # except parse_cmd.InvalidArgument as exc:
         #     resp = f"{ctx.author.mention}: {exc.args[0]}"
         # except parse_cmd.InvalidSyntax as exc:
@@ -354,10 +354,12 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         # except Exception as exc:
             # print(type(exc))
             # print(exc.with_traceback())
-            # resp = f"{ctx.author.mention}: There was an error while performing this !cmd operation."
+            # resp = f"There was an error while performing this !cmd operation."
         # finally:
             # await ctx.send(resp)
-        await ctx.send(resp)
+        # else:
+            # resp = f"{ctx.author.mention}: Command {"
+        await ctx.send(f"{ctx.author.mention}: {resp}")
 
 
 

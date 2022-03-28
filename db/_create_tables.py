@@ -91,12 +91,13 @@ create table if not exists command (
     , perms text not null
     , count integer
     , is_hidden integer not null
-    , is_builtin integer not null
+    , override_builtin integer not null
     , is_enabled integer not null
-    , author text not null
-    , modified_by text
-    , ctime text not null
-    , mtime text not null
+    , author_id integer not null
+    , modified_by integer
+    , modified_on text
+    , ctime text -- not null
+    , mtime text -- not null
     , foreign key(channel_id) references channel(id)
 );
 """
