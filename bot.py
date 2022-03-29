@@ -294,12 +294,10 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
     async def command_cmd(self, ctx: commands.Context):
         # print("!cmd was called by", ctx.author.id)
         # print(type(ctx.author.id))
-        # print(self.regd_channels[ctx.author.id].commands)
+        print(self.regd_channels[int(ctx.author.id)].commands)
         cmd, msg = ctx.message.content.split(None, 1)
-        print(msg)
         resp = ""
         # cmd, action, msg = msg.split(None, 1)
-        print(msg.split)
         action_switch = {
             '!cmd': '',
             '!addcmd': 'add',
@@ -316,12 +314,12 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         # command_name = message = aliases = perms = count = is_hidden = override_builtin = is_enabled = None
 
         try:
-            print(f"{cmd=}")
-            print(f"{action=}")
-            print(f"{msg=}")
+            # print(f"{cmd=}")
+            # print(f"{action=}")
+            # print(f"{msg=}")
             parsed = parse_cmd.parse(msg=(action + ' ' + msg))
             # print(f"{type(parsed)=}")
-            print(f"{parsed=}")
+            # print(f"{parsed=}")
             channel = await ctx.channel.user()
             # print(type(channel.id))
             if isinstance(parsed, tuple):
@@ -336,9 +334,10 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
             cmd_info['channel_id'] = channel.id
             cmd_info['author_id'] = int(ctx.author.id)
             # print(type(ctx.author.id))
-            # print(self.regd_channels[channel.id].commands['!foo'])
+                # print(self.regd_channels[channel.id].commands['!foo'])
             if action in ('add', 'edit', 'disable', 'enable'):
                 resp = self._update_command(action, cmd_info)
+                print(self.regd_channels[int(ctx.author.id)].commands)
 
         except base_classes.RegistrationError as exc:
             resp = exc.args[0]

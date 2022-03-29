@@ -91,7 +91,7 @@ create table if not exists command (
     , perms text not null
     , count integer
     , is_hidden integer not null
-    , override_builtin integer not null
+    , override_builtin integer -- not null
     , is_enabled integer not null
     , author_id integer not null
     , modified_by integer

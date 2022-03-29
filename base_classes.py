@@ -128,7 +128,7 @@ class Yeetrbot:
         _sql = f"select {','.join(fields)} from command" # where override_builtin = None"
         records = self._db.execute(_sql)
         for record in records:
-            print(f"{record=}")
+            # print(f"{record=}")
             command = RegisteredCommand(*record)
             self.regd_channels[command.channel_id].commands[command.name] = command
 
@@ -206,11 +206,11 @@ class Yeetrbot:
         if channel_id not in self.regd_channels.keys():
             raise RegistrationError(f"Channel with id {channel_id} is not registered.")
         channel_commands = self.regd_channels[channel_id].commands
-        print(f"{type(channel_commands)}")
         if command_name in self.built_ins:
             raise RegistrationError(f"Command name {command_name!r} conflicts with a built-in command with the same name.")
         # if command_name in self.defaults:
         #     raise RegistrationError(f"Command name {command_name!r} conflicts with a default command with the same name.")
+
 
         for k, v in tuple(cmd_info.items()):
             if v == None:
@@ -223,9 +223,20 @@ class Yeetrbot:
         command_info = RegisteredCommand(**cmd_info)
 
         if action == 'add':
-            if command_name in channel_commands.keys():
-                raise RegistrationError(f"{channel_commands[command_name]} is already registered.")
-            command_info = command_info._replace(is_hidden=0, override_builtin=0, is_enabled=1)
+            if command_name in channel_commands:
+                raise RegistrationError(f"Command {command_name!r} already exists! To change its properties, use '!cmd edit' or '!editcmd'.")
+
+            reqd_defaults = {
+            'perms': 'everyone',
+            'is_hidden': 0,
+            # 'override_builtin': None,
+            'is_enabled': 1,
+            }
+
+            for k, v in reqd_defaults.items():
+                cmd_info.setdefault(k, v)
+
+            command_info = RegisteredCommand(**cmd_info)
             self.regd_channels[channel_id].commands[command_name] = command_info
             # self.regd_channels[channel_id].commands[command_name] = 
             # fields = cmd_info.keys()
@@ -236,30 +247,32 @@ class Yeetrbot:
                 with self._db_conn:
                     self._db.execute(_sql, command_info)
             except sqlite3.IntegrityError as exc:
-                raise RegistrationError(f"Failed registering command {command_name}: {exc.args[0]}")
-            return f"Command {command_name} successfully added."
+                raise RegistrationError(f"Failed registering command {command_name!r}: {exc.args[0]}")
+            return f"Command {command_name!r} added successfully!"
 
         elif action == 'edit':
             if command_name not in channel_commands.keys():
-                raise RegistrationError(f"Command name {command_name} has not been registered.")
+                raise RegistrationError(f"Command {command_name!r} does not exist!")
             # update_dict = dict(*(i for i in cmd_info.items() if i[1] != None))
             # fields, vals = ((i[0], i[1]) for i in update_dict.items())
 
-            old_command = self.regd_channels[channel_id].commands[command_name]
+            old_command = self.regd_channels[channel_id].commands[command_name]._asdict()
             # print(f"{type(old_command._asdict())=}")
-            old_command._asdict().update(cmd_info)
-            new_command = RegisteredCommand(**old_command._asdict())
+            old_command.update(cmd_info)
+            new_command = RegisteredCommand(**old_command)
             self.regd_channels[channel_id].commands[command_name] = new_command
             fields = new_command._fields
             # self.regd_channels[channel_id].commands[command_name].__dict__.update(fields)
 
             try:
-                _sql = f"update command set({','.join(fields)}) values ({','.join(['?'] * len(fields))}) where (channel_id, name) = ({str(channel_id)}, {command_name})"
+                _sql = f"update command set({','.join(fields)}) = ({','.join(['?'] * len(fields))}) where (channel_id, name) = ({str(channel_id)}, {command_name!r})"
                 with self._db_conn:
                     self._db.execute(_sql, new_command)
-            except sqlite3.IntegrityError as exc:
+            except sqlite3.Error as exc:
                 raise RegistrationError(f"Failed registering command {command_name}: {exc.args[0]}")
-            return f"Command {command_name} successfully edited."
+            except Exception as exc:
+                print(exc.args[0])
+            return f"Command {command_name!r} edited successfully!"
 
 
 
