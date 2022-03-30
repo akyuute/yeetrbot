@@ -30,15 +30,16 @@ cmd_edit.add_argument('--rename', '-r', nargs=1, default=None, dest='new_name')
 cmd_add_or_edit.add_argument('--enable', '-e', action='store_const', const=1, dest='is_enabled')
 
 other_cmd_actions = subparsers.add_parser('!cmd', add_help=False)
-other_cmd_actions.add_argument('name', nargs='+')
+other_cmd_actions.add_argument('commands', nargs='+')
 
-cmd_delete = subparsers.add_parser('delete', parents=[other_cmd_actions], aliases=('remove',), exit_on_error=False, description="Delete commands.", help="Multiple commands may be deleted at once.")
+cmd_delete = subparsers.add_parser('delete', parents=[other_cmd_actions], exit_on_error=False, description="Delete commands.", help="Multiple commands may be deleted at once.")
 cmd_disable = subparsers.add_parser('disable', parents=[other_cmd_actions], exit_on_error=False, description="Disable commands.", help="Multiple commands may be disabled at once.")
 cmd_enable = subparsers.add_parser('enable', parents=[other_cmd_actions], exit_on_error=False, description="Enable commands.", help="Multiple commands may be enabled at once.")
 # cmd_ = subparsers.add_parser('enable', parents=[other_cmd_actions], exit_on_error=False, description="Enable commands.", help="Multiple commands may be enabled at once.")
 
 class InvalidArgument(Exception): ...
 class InvalidSyntax(Exception): ...
+class InvalidAction(Exception): ...
 
 
 def parse(msg: str, parser: argparse.ArgumentParser = parser):
@@ -49,6 +50,14 @@ def parse(msg: str, parser: argparse.ArgumentParser = parser):
         if '-h' in args or '--help' in args:
             return parser.print_help()
         raise InvalidSyntax("Syntax Error: Not enough arguments. <!cmd syntax info>")
+    if args[0] in ('delete', 'enable', 'disable'):
+        # try:
+        result = parser.parse_args(args)
+        print(f"{result=}")
+        return result
+        # except argparse.ArgumentError as exc:
+            # raise InvalidArgument
+
     num_parsed = 1
     last_result: argparse.Namespace = None
     valid_flags = ('--help', '-h', '--permissions', '-p', '--aliases', '-a', '--count', '-c', '--hide', '-i', '--disable', '-d',  )

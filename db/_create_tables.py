@@ -25,7 +25,7 @@ create table if not exists channel (
     -- id text primary key
     , name text unique not null
     , display_name text unique not null
-    , history text
+    -- , history text
 );
 """
 

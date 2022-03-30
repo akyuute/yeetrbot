@@ -3,13 +3,9 @@
 from twitchio.ext import commands
 # from twitchio import channel, chatter, FollowEvent, ChannelInfo, Clip, User
 import random
-import re
 import os
-import sqlite3
-from db._create_tables import _create_tables
 import csv
 import atexit
-# from os import environ
 from dotenv import load_dotenv
 import parse_cmd
 import base_classes
@@ -20,6 +16,7 @@ from my_commands import string_commands
 
 # Load and assign environment variables
 env_file = ".bot.env"
+db_file = "db/botdb.db"
 load_dotenv(env_file)
 env_keys = ('ACCESS_TOKEN', 'CLIENT_ID', 'BOT_NICK', 'BOT_PREFIX', 'INITIAL_CHANNELS')
 ENV: dict = {k: v for k, v in os.environ.items() if k in env_keys}
@@ -30,175 +27,10 @@ ENV['INITIAL_CHANNELS'] = ENV['INITIAL_CHANNELS'].split(',')
 channel_data_fields = ['channel', 'commands', 'death_count']
 channel_data_file = 'db/channel_data.csv'
 
-
-class RegistrationError(Exception): ...
-class CustomError(Exception): ...
-
-
-class Yeetrbot:
-    '''Contains methods for database exchanges and additional functionality.'''
-    channel_data: dict
-    # def __init__(self):
-    #     self._init_database()
-    #     self.channel_data = self._fetch_channel_data()
-    #     self._fetch_commands()
-    #     self._fetch_builtins()
-
-    def _init_database(self):
-        self.db_conn = sqlite3.connect("db/botdb.db")
-        self.db = self.db_conn.cursor()
-        with self.db_conn:
-            for stmt in _create_tables:
-                self.db.execute(stmt)
-
-    def _fetch_channel_data(self):
-        '''Retrieves registered channels from the database.'''
-        keys = ('id', 'name', 'display_name', 'history')
-        records = self.db.execute("select * from channel")
-        channel_data = {}
-        for rec in records:
-            chan_id = int(rec[0])
-            channel_data[chan_id] = {k: v for k, v in zip(keys, rec)} # , 'commands': {}, 'variables': {}}
-            channel_data[chan_id]['commands'] = {}
-            channel_data[chan_id]['variables'] = {}
-        # print("Join:", self.db.execute("select * from channel join command on channel.id = command.chan_id").fetchall())
-        return channel_data
-
-    def _fetch_commands(self):
-        '''Retrieves the registered custom commands for each channel
-        and stores them in the channel_data dict.'''
-        keys = ('chan_id', 'name', 'aliases', 'message', 'perms', 'count', 'is_enabled')
-        # records = self.db.execute("select * from command where override_builtin = 0")
-        records = self.db.execute(f"select {','.join(keys)} from command where override_builtin = 0")
-        # custom_commands = {int(rec[2]): {k: v for k, v in zip(keys, rec)} for rec in records}
-        custom_commands = [{k: v for k, v in zip(keys, rec)} for rec in records]
-        # print(custom_commands)
-        # for channel in self.channel_data:
-        # try:
-            # 'commands' in self.channel_data.values()
-        # except KeyError:
-            # self.channel_data[channel_user_id]['commands'] = {}
-            # print("Unable to fetch commands")
-            # pass
-        # finally:
-            # self.channel_data[channel_user_id]['commands'][command_name] = new_dict
-        try:
-            for com in custom_commands:
-                self.channel_data[com['chan_id']]['commands'][com['name']] = com
-        except KeyError as exc:
-            print("_fetch_commands: KeyError")
-            print(exc.args[0])
-
-    def _fetch_built_ins(self):
-        '''Retrieves the registered built-in commands for each channel
-        and stores them in the channel_data dict.'''
-        keys = ('chan_id', 'name', 'aliases', 'perms', 'count', 'is_enabled')
-        records = self.db.execute(f"select {','.join(keys)} from command where override_builtin = 1")
-        # builtins = {int(rec[1]): {k: v for k, v in zip(keys, rec)} for rec in records}
-        built_ins = [{k: v for k, v in zip(keys, rec)} for rec in records]
-        try:
-            for com in built_ins:
-                self.channel_data[com['chan_id']]['built_ins'][com['name']] = com
-        except KeyError:
-            print("_fetch_global_commands: KeyError")
-
-    @property
-    def channels(self):
-        data = self.channel_data
-        names = [data[chan]['name'] for chan in data]
-        names += ENV['INITIAL_CHANNELS']
-        return set(names)
-
-
-
-
-    def register_channel(self, channel_user_id: int, name: str, display_name: str):
-        '''Registers a new channel for the bot to serve. If the channel is
-        registered, its values are updated.'''
-        keys = ('id', 'name', 'display_name', 'history')
-        new_dict = {k: v for k, v in zip(keys, [channel_user_id, name, display_name])}
-        # self.channel_data[channel_user_id].update(new_dict)
-        self.channel_data[channel_user_id] = new_dict
-        _sql = "insert into channel(id, name, display_name) values (?,?,?)"
-        # if channel_user_id not in self.channel_data:
-        try:
-            with self.db_conn:
-                self.db.execute(_sql, [str(channel_user_id), name, display_name])
-                self.db_conn.commit()
-        except sqlite3.Error as exc:
-            print(exc.args[0])
-            return exc
-
-    def register_command(self, channel_user_id: int, command_name: str, message: str, aliases: str = None, perms: str = 'everyone', count: int = None):
-        if not channel_user_id in self.channel_data:
-            return RegistrationError("This channel is not registered.")
-        keys = ('chan_id', 'name', 'aliases', 'message', 'perms', 'count', 'override_builtin', 'is_enabled')
-        new_dict = {k: v for k, v in zip(keys, [channel_user_id, command_name, aliases, message, perms, count, 0, 1])}
-        try:
-            isinstance(self.channel_data[channel_user_id]['commands'], dict)
-        except KeyError:
-            self.channel_data[channel_user_id]['commands'] = {}
-        finally:
-            self.channel_data[channel_user_id]['commands'][command_name] = new_dict
-
-        _sql = "insert into command(chan_id, name, aliases, message, perms, count, override_builtin, is_enabled) values (?,?,?,?,?,?,?,?)"
-        # print([str([*new_dict.values()])])
-        # if command_name not in self.channel_data[channel_user_id]['commands']:
-        try:
-            with self.db_conn:
-                # self.db.execute(_sql, [str(channel_user_id), command_name, message, ])
-                # self.db.execute(_sql, [str(v) for v in new_dict.values() if v not None])
-                self.db.execute(_sql,[v for v in new_dict.values()])
-                self.db_conn.commit()
-        except sqlite3.Error as exc:
-            print(exc.args[0])
-                # return exc
-
-    def register_built_in(self, channel_user_id: int, command_name: str, aliases: str = None, perms: str = 'everyone', count: int = None):
-        if not channel_user_id in self.channel_data:
-            return RegistrationError("This channel is not registered.")
-        keys = ('chan_id', 'name', 'aliases', 'perms', 'count', 'is_enabled')
-        new_dict = {k: v for k, v in zip(keys, [channel_user_id, command_name, aliases, perms, count, 1])}
-        try:
-            isinstance(self.channel_data[channel_user_id]['commands'], dict)
-        except KeyError:
-            self.channel_data[channel_user_id]['commands'] = {}
-        finally:
-            self.channel_data[channel_user_id]['commands'][command_name] = new_dict
-
-        _sql = "insert into command(chan_id, name, aliases, message, perms, count, override_builtin, is_enabled) values (?,?,?,?,?,?,?,?)"
-        # print([str([*new_dict.values()])])
-        # if command_name not in self.channel_data[channel_user_id]['commands']:
-        try:
-            with self.db_conn:
-                # self.db.execute(_sql, [str(channel_user_id), command_name, message, ])
-                # self.db.execute(_sql, [str(v) for v in new_dict.values() if v not None])
-                self.db.execute(_sql,[v for v in new_dict.values()])
-                self.db_conn.commit()
-        except sqlite3.Error as exc:
-            print(exc.args[0])
-                # return exc
-        # pass
-
-    def register_variable(self, varname: str):
-        _sql = "insert into variable(var_name) values (?)"
-        try:
-            with self.db_conn:
-                self.db.execute(_sql)
-                self.db_conn.commit()
-        except sqlite3.Error as exc:
-            print(exc.args[0])
-
-    def set_chan_variable(self, varname, value):
-        _sql = "update ..."
-        pass
-
-
-# class ChatBot(commands.Bot, Yeetrbot):
 class ChatBot(commands.Bot, base_classes.Yeetrbot):
     '''Base class for bot configs containing default commands and variables.'''
     def __init__(self):
-        self._init_database()
+        self._init_database(db_file)
         # self.channel_data = self._init_channels()
         self._init_channels()
         self._init_commands()
@@ -212,6 +44,10 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         print(self.regd_channels)
         # print(self.channels)
         # print(self.com)
+
+        self.global_before_invoke = self._global_before_invoke
+        self.event_message = self._event_message
+        self.event_ready = self._event_ready
 
 
 
@@ -240,125 +76,64 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
     #         return names
 
 
-    async def global_before_invoke(self, ctx: commands.Context):
-        chan = await ctx.channel.user()
-        # chan.id
-        # cmd = str(ctx.message.content).partition(' ')[0]
-        cmd = ctx.command
-        # if cmd.name not in self.channel_data[chan.id]['commands']:
-            # ctx.is_valid = False if cmd.name == '!join' else True
-            # pass
-        print(cmd.name, chan.id, chan.display_name)
-        # if cmd.name not in self
-        # if not cmd in 
 
-        # return await 
-        # pass
-
-    async def event_ready(self):
-        # Post a message in the console upon connection
-        print(f"{self.display_name} is online!")
-        # Also post a message in chat upon connection
-        for channel in self.connected_channels:
-            # await self.get_channel(channel).send(f"{self.display_name} is online!")
-            pass
-
-    # async def event(self, name: str = "imdad"):
-        # return super().event(name)
-
-    # add this and other event handlers to a cog:
-    async def event_message(self, message):
-        msg: str = message.content
-        # Messages with echo set to True are messages sent by the bot...
-        # For now we just want to ignore them...
-        if message.echo:
+    @commands.command(name="join")
+    async def join_new_channel(self, ctx: commands.Context):
+        '''Attempts to register a new channel to the database when invoked within the bot's own channel.'''
+        resp = ""
+        self.fetch_channel()
+        if ctx.msg:
+            await ctx.send(f"{ctx.author.mention}, the !join command must be blank.")
             return
-
-        # Do imdad()
-        if str(message.content)[:6].lower().startswith(("i'm ", "i am ", "im ")):
-            if random.random() < 0.2:
-                await message.channel.send(string_commands.imdad(msg))
-
-
-        # Print the contents of our message to console...
-        # Also may be useful to append to a log file
-        #####if message.echo:
-        #print(message.content)
-
-        # Since we have commands and are overriding the default `event_message`
-        # We must let the bot know we want to handle and invoke our commands...
-        await self.handle_commands(message)
+        uid = int(ctx.author.id)
+        username = ctx.author.name
+        display_name = ctx.author.display_name
+        if uid not in self.regd_channels:
+            try:
+                self.register_channel(uid, username, display_name)
+                # Add the channel to the TwitchIO bot's list:
+                await self.join_channels([username])
+                resp = "I have successfully joined your channel. See you there!"
+                # self.db.execute("commit")
+                # print("ran !join")
+                # print(self.channel_data)
+                print(self.regd_channels)
+            except Exception as exc:
+                # print(exc.args[0])
+                await ctx.send(f"""{ctx.author.mention}, I encountered an
+                    error while registering your channel. Please contact
+                    @derek_YEETr, who will help resolve the situation.""")
+        else:
+            resp = "I am already in your channel!"
+        await ctx.send(f"{ctx.author.mention}: {resp}")
 
 
     @commands.command(name='cmd', aliases=('addcmd', 'editcmd', 'delcmd', 'disable', 'enable'))
     async def command_cmd(self, ctx: commands.Context):
-        # print("!cmd was called by", ctx.author.id)
-        # print(type(ctx.author.id))
-        print(self.regd_channels[int(ctx.author.id)].commands)
-        cmd, msg = ctx.message.content.split(None, 1)
         resp = ""
-        # cmd, action, msg = msg.split(None, 1)
-        action_switch = {
-            '!cmd': '',
-            '!addcmd': 'add',
-            '!editcmd': 'edit',
-            '!delcmd': 'delete',
-            '!disable': 'disable',
-            #'!disablecmd': 'disable',
-            '!enable': 'enable',
-        }
-
-        action = action_switch[cmd]
-        if cmd == '!cmd':
-            action, msg = msg.split(None, 1)
-        # command_name = message = aliases = perms = count = is_hidden = override_builtin = is_enabled = None
-
+        if not ctx.author.is_mod:
+            await ctx.send(f"{ctx.author.mention}: Only moderators or higher can use this command.")
+            return
+        # cmd_perms = channel.commands[cmd].perms
+        # if channel.users[auth_id].rank not in cmd_perms:
+            # await ctx.send(f"{ctx.author.mention}: ")
         try:
-            # print(f"{cmd=}")
-            # print(f"{action=}")
-            # print(f"{msg=}")
-            parsed = parse_cmd.parse(msg=(action + ' ' + msg))
-            # print(f"{type(parsed)=}")
-            # print(f"{parsed=}")
-            channel = await ctx.channel.user()
-            # print(type(channel.id))
-            if isinstance(parsed, tuple):
-                cmd_info, message = parsed
-            elif not parsed:
-                raise TypeError("Parser returned NoneType, most likely resulting from a --help flag.")
-            else:
-                cmd_info = parsed
-                message = None
-            cmd_info = vars(cmd_info)
-            cmd_info['message'] = message
-            cmd_info['channel_id'] = channel.id
-            cmd_info['author_id'] = int(ctx.author.id)
-            # print(type(ctx.author.id))
-                # print(self.regd_channels[channel.id].commands['!foo'])
-            if action in ('add', 'edit', 'disable', 'enable'):
-                resp = self._update_command(action, cmd_info)
-                print(self.regd_channels[int(ctx.author.id)].commands)
-
+            resp = self._handle_cmd(ctx)
+            print(resp)
         except base_classes.RegistrationError as exc:
             resp = exc.args[0]
-        except (parse_cmd.InvalidArgument, parse_cmd.InvalidSyntax) as exc:
+            print("Registration error:", resp)
+        except (parse_cmd.InvalidArgument, parse_cmd.InvalidSyntax, parse_cmd.InvalidAction) as exc:
             resp = exc.args[0]
-        # except parse_cmd.InvalidArgument as exc:
-        #     resp = f"{ctx.author.mention}: {exc.args[0]}"
-        # except parse_cmd.InvalidSyntax as exc:
-        #     resp = f"{ctx.author.mention}: {exc.args[0]}"
-        # except TypeError as exc:
-            # print(exc.args[0])
-            # resp = f"{ctx.author.mention}: TypeError: {exc}"
-        # except Exception as exc:
-            # print(type(exc))
-            # print(exc.with_traceback())
-            # resp = f"There was an error while performing this !cmd operation."
-        # finally:
-            # await ctx.send(resp)
-        # else:
-            # resp = f"{ctx.author.mention}: Command {"
-        await ctx.send(f"{ctx.author.mention}: {resp}")
+            print("Parsing error:", resp)
+        except TypeError as exc:
+            resp = exc.args[0]
+            print("Type error:", resp)
+        except Exception as exc:
+            resp = "An unexpected error occurred while processing this command."
+            print("Unexpected error:", resp)
+        finally:
+            await ctx.send(f"{ctx.author.mention}: {resp}")
 
 
 
@@ -401,35 +176,6 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         # print(self.regd_channels)
         # await ctx.send("I'm awake!")
     
-
-    @commands.command(name="join")
-    async def join_new_channel(self, ctx: commands.Context):
-        '''Attempts to register a new channel to the database when invoked within the bot's own channel.'''
-        msg = str(ctx.message.content).partition(" ")[2]
-        if msg:
-            await ctx.send(f"{ctx.author.mention}, the !join command must be blank.")
-            return
-        uid = int(ctx.author.id)
-        username = ctx.author.name
-        display_name = ctx.author.display_name
-        # if uid not in self.channel_data:
-        if uid not in self.regd_channels:
-            try:
-                self.register_channel(uid, username, display_name)
-                await self.join_channels([username])
-                await ctx.send(f"{ctx.author.mention}, I have successfully joined your channel. See you there!")
-                # self.db.execute("commit")
-                # print("ran !join")
-                # print(self.channel_data)
-                print(self.regd_channels)
-            except Exception as exc:
-                print(exc.args[0])
-                await ctx.send(f"""{ctx.author.mention}, I encountered an
-                    error while registering your channel. Please contact
-                    @derek_YEETr, who will help resolve the situation.""")
-        else:
-            await ctx.send(f"{ctx.author.mention}, I am already in your channel!")
-
 
 
 
