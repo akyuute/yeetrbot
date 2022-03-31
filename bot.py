@@ -78,35 +78,12 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
 
 
     @commands.command(name="join")
-    async def join_new_channel(self, ctx: commands.Context):
-        '''Attempts to register a new channel to the database when invoked within the bot's own channel.'''
-        resp = ""
-        self.fetch_channel()
-        if ctx.msg:
-            await ctx.send(f"{ctx.author.mention}, the !join command must be blank.")
+    async def command_join(self, ctx: commands.Context):
+        if ctx.chan_as_user.id != self.user_id:
             return
-        uid = int(ctx.author.id)
-        username = ctx.author.name
-        display_name = ctx.author.display_name
-        if uid not in self.regd_channels:
-            try:
-                self.register_channel(uid, username, display_name)
-                # Add the channel to the TwitchIO bot's list:
-                await self.join_channels([username])
-                resp = "I have successfully joined your channel. See you there!"
-                # self.db.execute("commit")
-                # print("ran !join")
-                # print(self.channel_data)
-                print(self.regd_channels)
-            except Exception as exc:
-                # print(exc.args[0])
-                await ctx.send(f"""{ctx.author.mention}, I encountered an
-                    error while registering your channel. Please contact
-                    @derek_YEETr, who will help resolve the situation.""")
-        else:
-            resp = "I am already in your channel!"
+        resp, username = self._join_channel(ctx)
+        await self.join_channels([username])
         await ctx.send(f"{ctx.author.mention}: {resp}")
-
 
     @commands.command(name='cmd', aliases=('addcmd', 'editcmd', 'delcmd', 'disable', 'enable'))
     async def command_cmd(self, ctx: commands.Context):
@@ -118,29 +95,31 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         # if channel.users[auth_id].rank not in cmd_perms:
             # await ctx.send(f"{ctx.author.mention}: ")
         try:
-            resp = self._handle_cmd(ctx)
-            print(resp)
+            resp = self._manage_custom_command(ctx)
+            # print(resp)
         except base_classes.RegistrationError as exc:
             resp = exc.args[0]
             print("Registration error:", resp)
+        except base_classes.DatabaseError as exc:
+            resp = exc.args[0]
+            print("Database error", resp)
         except (parse_cmd.InvalidArgument, parse_cmd.InvalidSyntax, parse_cmd.InvalidAction) as exc:
             resp = exc.args[0]
             print("Parsing error:", resp)
         except TypeError as exc:
             resp = exc.args[0]
             print("Type error:", resp)
-        except Exception as exc:
-            resp = "An unexpected error occurred while processing this command."
-            print("Unexpected error:", resp)
-        finally:
-            await ctx.send(f"{ctx.author.mention}: {resp}")
-
+        # finally:
+        #     print(resp)
+        #     await ctx.send(f"{ctx.author.mention}: {resp}")
+        print(resp)
+        await ctx.send(f"{ctx.author.mention}: {resp}")
 
 
     @commands.command(name="testmsg")
     async def command_testmsg(self, ctx: commands.Context):
-        msg = ctx.message.content
-        au = ctx.author
+        # msg = ctx.message.content
+        # au = ctx.author
         # print(au._fetch_channel().user())
         # await ctx.send(str(len(au.user().fetch_followers()) )) # fetch_following())
         # myuserobj = au.user()
@@ -166,16 +145,16 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         # print(msg.lstrip(r"^.*\s"), msg.removeprefix(r"!.*\s"))
         # print(ctx.message.raw_data)
         # channel_usr = await ctx.channel.user()
-        my_usr = await ctx.author.user()
-        # bot_usr = ctx.get_user('yeetrbot')
+        # my_usr = await ctx.author.user()
+        # bot_usr = await self.fetch_users([ENV['BOT_NICK'].lower()])
 
         # print(bot_usr)
         # print(channel_usr.id)
-        print(my_usr.id)
-        print(my_usr.id)
+        # print(my_usr.id)
         # print(self.regd_channels)
         # await ctx.send("I'm awake!")
     
+        pass
 
 
 
