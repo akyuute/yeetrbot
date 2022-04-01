@@ -6,14 +6,13 @@ import random
 # import os
 from collections import namedtuple
 import sqlite3
+# from textwrap import dedent
 from typing import Callable, Sequence
 from db._create_tables import _create_tables
 import my_commands.built_ins as built_in_commands
 # import my_commands.default_commands as default_commands
 from my_commands import string_commands
-# import csv
 # import atexit
-# from os import environ
 # from dotenv import load_dotenv
 import parse_cmd
 
@@ -161,8 +160,9 @@ class Yeetrbot:
             #     resp = f"DatabaseError: {exc.args[0]}"
             except Exception as exc:
                 print(exc.args[0])
-                resp = f"""An unexpected error occurred while attempting to
-                    join your channel: {exc.args[0]}"""
+                resp = f"""
+                An unexpected error occurred while attempting to
+                join your channel: {exc.args[0]}"""
         else:
             resp = "I am already in your channel!"
         return resp, username
@@ -194,13 +194,10 @@ class Yeetrbot:
             err = f"Channel with id {channel_id} is not registered."
             raise RegistrationError(err)
 
-        action_switch = {
-            'addcmd': 'add',
-            'editcmd': 'edit',
-            'delcmd': 'delete',
-            'disable': 'disable',
-            'enable': 'enable',
-        }
+        action_switch = {a + built_in_name: a for a in 'add edit del'.split()}
+        action_switch['del'+built_in_name] = 'delete'
+        for a in 'disable enable'.split():
+            action_switch[a] = a
 
         func_switch = {
             'add': self._add_command,
@@ -218,9 +215,17 @@ class Yeetrbot:
         action = ''
         # msg = ''
         msg = ctx.msg
-        print("Prefixless=", prefixless)
-        print("BI name=", built_in_name)
+        # print("Prefixless=", prefixless)
+        # print("BI name=", built_in_name)
         body = ctx.msg.split(None, 1)
+        print("msg=", msg)
+        print("body=", body)
+        # if len(body) != 2:
+            # try:
+                # return parse_cmd.parse(body[0])
+            # except Exception as exc:
+                # print("Parser exception...", exc)
+                # print(type(exc), exc.args[0])
         if prefixless == built_in_name:
             action, msg = body
             syntax = "<cmd syntax>"
@@ -238,7 +243,8 @@ class Yeetrbot:
         if isinstance(parsed, tuple):
             cmd_info, message = parsed
         elif not parsed:
-            err = """Parser returned NoneType, most likely resulting from a
+            err = """
+            Parser returned NoneType, most likely resulting from a
             --help flag. Those will be implemented soon!"""
             raise TypeError(err)
         else:
@@ -268,7 +274,9 @@ class Yeetrbot:
         channel_id = cmd['channel_id']
         channel = self.regd_channels[channel_id]
         if cmd['name'] in channel.commands:
-            err = f"""Command {cmd['name']!r} already exists. To change its properties, use '!cmd edit' or '!editcmd'"""
+            err = f"""
+            Command {cmd['name']!r} already exists.
+            To change its properties, use '!cmd edit' or '!editcmd'"""
             raise RegistrationError(err)
         if cmd['name'] in self.built_ins:
             err = f"""
@@ -291,9 +299,12 @@ class Yeetrbot:
         command = RegisteredCommand(**cmd)
         self.regd_channels[channel_id].commands[cmd['name']] = command
         fields = ','.join(command._fields)
-        vals = ','.join(['?'] * len(fields))
+        vals = ','.join(['?'] * len(command._fields))
         _sql = f"insert into command({fields}) values ({vals})"
         print("command in _add_command:", command)
+        print(fields)
+        print(vals)
+        print(_sql)
         try:
             with self._db_conn:
                 self._db.execute(_sql, command)
@@ -311,12 +322,13 @@ class Yeetrbot:
             err = f"{error_preface}: Command {cmd['name']!r} does not exist."
             raise RegistrationError(error_preface + err)
         if cmd['name'] in self.built_ins:
-            err = f"""{error_preface}:
-                Name conflict: Command name {cmd['name']!r} conflicts with
-                a built-in command with the same name.
-                Use '--override_builtin' if you want to replace it with your
-                custom command. If you change your mind later, simply delete
-                the custom command."""
+            err = f"""
+            {error_preface}:
+            Name conflict: Command name {cmd['name']!r} conflicts with
+            a built-in command with the same name.
+            Use '--override_builtin' if you want to replace it with your
+            custom command. If you change your mind later, simply delete
+            the custom command."""
             raise RegistrationError(error_preface + err)
         if cmd['name'] not in channel.commands:
             err = f"Command {cmd['name']!r} does not exist."
@@ -339,7 +351,8 @@ class Yeetrbot:
             raise DatabaseError(error_preface + err)
         # except Exception as exc:
             # print(exc.args[0])
-            # err = f"""An unexpected error occurred while updating command
+            # err = f"""
+            # An unexpected error occurred while updating command
             # {command.name!r}: """
             # return f"{err} {exc.args[0]}"
             # raise Exception(error_preface + err + exc.args[0])
