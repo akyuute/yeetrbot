@@ -8,7 +8,7 @@ import csv
 import atexit
 from dotenv import load_dotenv
 from textwrap import dedent
-import parse_cmd
+from parse_cmd import InvalidAction, InvalidArgument, InvalidSyntax
 import base_classes
 from my_commands import string_commands
 # from my_commands.string_commands import derp, uwu, uhm
@@ -97,23 +97,20 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
             # await ctx.send(f"{ctx.author.mention}: ")
         try:
             resp = self._manage_custom_command(ctx)
-            # print(resp)
         except base_classes.RegistrationError as exc:
             resp = exc.args[0]
             print("Registration error:", resp)
         except base_classes.DatabaseError as exc:
             resp = exc.args[0]
             print("Database error", resp)
-        except (parse_cmd.InvalidArgument, parse_cmd.InvalidSyntax, parse_cmd.InvalidAction) as exc:
+        except (InvalidArgument, InvalidSyntax, InvalidAction) as exc:
             resp = exc.args[0]
             print("Parsing error:", resp)
         except TypeError as exc:
             resp = exc.args[0]
             print("Type error:", resp)
-        # finally:
-        #     print(resp)
-        #     await ctx.send(f"{ctx.author.mention}: {resp}")
-        print(dedent(resp))
+        else:
+            print(dedent(resp))
         await ctx.send(f"{ctx.author.mention}: {dedent(resp)}")
 
 
