@@ -8,7 +8,7 @@ cmd_add_or_edit = subparsers.add_parser('!cmd', add_help=False)
 cmd_add_or_edit.set_defaults(is_enabled=None)
 
 cmd_add_or_edit.add_argument('name', nargs=1)
-cmd_add_or_edit.add_argument('--perms', '-p', choices="everyone rank= moderator vip owner".split())
+cmd_add_or_edit.add_argument('--perms', '-p', choices="everyone vip moderator owner rank=".split(), type=lambda s: s.lower())
 cmd_add_or_edit.add_argument('--aliases', '-a', nargs=1)
 cmd_add_or_edit.add_argument('--count', '-c', type=int)
 cmd_add_or_edit.add_argument('--disable', '-d', action='store_const', const=0, dest='is_enabled')
