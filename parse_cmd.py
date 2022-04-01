@@ -16,16 +16,12 @@ cmd_add_or_edit.add_argument('--hide', '-i', action='store_const', const=1, dest
 cmd_add_or_edit.add_argument('--override_builtin', action='store_const', const=1)
 
 cmd_add = subparsers.add_parser('add', parents=[cmd_add_or_edit], exit_on_error=False, description="Add a new custom command.", help="ADD HELP")
-#cmd_add.set_defaults(is_enabled=True)
 
 cmd_edit = subparsers.add_parser('edit', parents=[cmd_add_or_edit], exit_on_error=False, description="Edit a custom command's message and properties.", help="EDIT HELP")
-# cmd_edit.set_defaults(func=edit)
-#cmd_edit.set_defaults(is_enabled=None)
 
+cmd_edit.add_argument('--enable', '-e', action='store_const', const=1, dest='is_enabled')
 cmd_edit.add_argument('--unhide', '-u', action='store_const', const=0, dest='is_hidden')
-# cmd_add_or_edit.add_argument('--visible', '-v', action='store_false', dest='is_hidden')
 cmd_edit.add_argument('--rename', '-r', nargs=1, default=None, dest='new_name')
-cmd_add_or_edit.add_argument('--enable', '-e', action='store_const', const=1, dest='is_enabled')
 
 other_actions = subparsers.add_parser('!cmd', add_help=False)
 other_actions.add_argument('commands', nargs='+')
