@@ -246,6 +246,7 @@ class Yeetrbot:
             message = None
 
         cmd = vars(cmd_info)
+        # print("1: ", cmd)
         channel_id = cmd['channel_id'] = ctx.chan_as_user.id
         # `cmd` will only have 'name' with 'add' or 'edit' actions.
         # 'name' will be a tuple when parsed; make it a str or None:
@@ -255,14 +256,16 @@ class Yeetrbot:
         # self.regd_channels[channel_id].commands[cmd['name']]['latest_modif'] = {
             # 'author_id': cmd['author_id'], 'used_shortcut': prefixless in action_switch
             # }
+
         aliases = cmd.get('aliases')
         if aliases:
             cmd['aliases'] = ','.join(aliases)
         for k in ('name', 'new_name'):
+            if cmd.get(k) is None:
+                continue
             cmd[k] = cmd.get(k, [None])[0]
-        # cmd['name'] = cmd.get('name', [None])[0]
-        # cmd['new_name'] = cmd.get('new_name', [None])[0]
 
+        # print("2: ", cmd)
         for k, v in tuple(cmd.items()):
             if v is None:
                 del cmd[k]
@@ -353,12 +356,15 @@ class Yeetrbot:
             raise RegistrationError(error_preface + dedent(err))
 
         old_command = channel.commands[name]._asdict()
-        old_command.update(cmd)
         if new_name:
-            old_command.update(name=new_name)
-            del old_command['new_name']
+            store_as = cmd['name'] = new_name
+            del cmd['new_name']
+            del self.regd_channels[channel_id].commands[name]
+        else:
+            store_as = name
+        old_command.update(cmd)
         command = RegisteredCommand(**old_command)
-        self.regd_channels[channel_id].commands[name] = command
+        self.regd_channels[channel_id].commands[store_as] = command
 
         columns = ','.join(command._fields)
         placehds = ','.join(['?'] * len(command._fields))
@@ -374,9 +380,8 @@ class Yeetrbot:
         except Exception as exc:
             err = "An unexpected error occurred while attempting this operation: "
             return err + exc.args[0]
-        else:
-            print(command)
-            return f"Command {name!r} was edited successfully."
+        print(command)
+        return f"Command {name!r} was edited successfully."
 
     def _delete_command(self, cmd):
         # error_preface = f"Unable to delete command {cmd['name']!r}: "
