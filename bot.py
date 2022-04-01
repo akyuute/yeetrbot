@@ -7,6 +7,7 @@ import os
 import csv
 import atexit
 from dotenv import load_dotenv
+from textwrap import dedent
 import parse_cmd
 import base_classes
 from my_commands import string_commands
@@ -112,8 +113,8 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         # finally:
         #     print(resp)
         #     await ctx.send(f"{ctx.author.mention}: {resp}")
-        print(resp)
-        await ctx.send(f"{ctx.author.mention}: {resp}")
+        print(dedent(resp))
+        await ctx.send(f"{ctx.author.mention}: {dedent(resp)}")
 
 
     @commands.command(name="testmsg")
