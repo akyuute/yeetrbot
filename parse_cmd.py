@@ -29,13 +29,14 @@ cmd_edit.add_argument('--unhide', '-u', action='store_false', dest='is_hidden')
 cmd_edit.add_argument('--rename', '-r', nargs=1, default=None, dest='new_name')
 cmd_add_or_edit.add_argument('--enable', '-e', action='store_const', const=1, dest='is_enabled')
 
-other_cmd_actions = subparsers.add_parser('!cmd', add_help=False)
-other_cmd_actions.add_argument('commands', nargs='+')
+other_actions = subparsers.add_parser('!cmd', add_help=False)
+other_actions.add_argument('commands', nargs='+')
 
-cmd_delete = subparsers.add_parser('delete', parents=[other_cmd_actions], exit_on_error=False, description="Delete commands.", help="Multiple commands may be deleted at once.")
-cmd_disable = subparsers.add_parser('disable', parents=[other_cmd_actions], exit_on_error=False, description="Disable commands.", help="Multiple commands may be disabled at once.")
-cmd_enable = subparsers.add_parser('enable', parents=[other_cmd_actions], exit_on_error=False, description="Enable commands.", help="Multiple commands may be enabled at once.")
-# cmd_ = subparsers.add_parser('enable', parents=[other_cmd_actions], exit_on_error=False, description="Enable commands.", help="Multiple commands may be enabled at once.")
+cmd_delete = subparsers.add_parser('delete', parents=[other_actions], exit_on_error=False, description="Delete commands.", help="Multiple commands may be deleted at once.")
+cmd_disable = subparsers.add_parser('disable', parents=[other_actions], exit_on_error=False, description="Disable commands.", help="Multiple commands may be disabled at once.")
+cmd_enable = subparsers.add_parser('enable', parents=[other_actions], exit_on_error=False, description="Enable commands.", help="Multiple commands may be enabled at once.")
+cmd_alias = subparsers.add_parser('alias', parents=[other_actions], exit_on_error=False, description="Set command aliases.", help="Specify one or more aliases for a given command.")
+
 
 class InvalidArgument(Exception): ...
 class InvalidSyntax(Exception): ...
