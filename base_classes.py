@@ -249,16 +249,19 @@ class Yeetrbot:
         channel_id = cmd['channel_id'] = ctx.chan_as_user.id
         # `cmd` will only have 'name' with 'add' or 'edit' actions.
         # 'name' will be a tuple when parsed; make it a str or None:
-        cmd['name'] = cmd.get('name', [None])[0]
         cmd['message'] = message
         cmd['author_id'] = ctx.author_id
         cmd['used_shortcut'] = prefixless in action_switch
-        aliases = cmd.get('aliases')
-        if aliases:
-            cmd['aliases'] = ','.join(aliases)
         # self.regd_channels[channel_id].commands[cmd['name']]['latest_modif'] = {
             # 'author_id': cmd['author_id'], 'used_shortcut': prefixless in action_switch
             # }
+        aliases = cmd.get('aliases')
+        if aliases:
+            cmd['aliases'] = ','.join(aliases)
+        for k in ('name', 'new_name'):
+            cmd[k] = cmd.get(k, [None])[0]
+        # cmd['name'] = cmd.get('name', [None])[0]
+        # cmd['new_name'] = cmd.get('new_name', [None])[0]
 
         for k, v in tuple(cmd.items()):
             if v is None:
@@ -326,26 +329,34 @@ class Yeetrbot:
     def _edit_command(self, cmd: dict):
         '''Alters a custom command's properties in memory and the database.'''
         name = cmd['name']
-        error_preface = f"Falied to update command {name!r}: "
-        err = ""
+        new_name = cmd.get('new_name')
         channel_id = cmd['channel_id']
         used_shortcut = cmd['used_shortcut']
         del cmd['used_shortcut']
         channel = self.regd_channels[channel_id]
+        error_preface = f"Falied to update command {name!r}: "
+        err = ""
 
         if name not in channel.commands:
-            err = f"This command does not exist. Use '!addcmd' to add it."
-        elif name in self.built_ins and not cmd['override_builtin']:
+            err = "This command does not exist. Use '!addcmd' to add it."
+        elif new_name in channel.commands:
             err = f"""
-            Command name conflicts with a built-in command with the same name.
-            Use '--override_builtin' if you want to replace it with your custom
-            command. If you change your mind later,
-            simply delete the custom command."""
+            Naming conflict: The name {new_name!r} matches another command with
+            the same name. Please find a different new name for {name!r}."""
+        elif new_name in self.built_ins and not cmd['override_builtin']:
+            err = f"""
+            Naming conflict: The name {new_name!r} matches a built-in command
+            with the same name. Use '--override_builtin' if you want to replace
+            it with your custom command. If you change your mind later, simply
+            delete the custom command."""
         if err:
             raise RegistrationError(error_preface + dedent(err))
 
         old_command = channel.commands[name]._asdict()
         old_command.update(cmd)
+        if new_name:
+            old_command.update(name=new_name)
+            del old_command['new_name']
         command = RegisteredCommand(**old_command)
         self.regd_channels[channel_id].commands[name] = command
 
@@ -353,6 +364,7 @@ class Yeetrbot:
         placehds = ','.join(['?'] * len(command._fields))
         cond = f"(channel_id, name) = ({channel_id}, {name!r})"
         _sql = f"update command set({columns}) = ({placehds}) where {cond}"
+        print(_sql)
         try:
             with self._db_conn:
                 self._db.execute(_sql, command)
@@ -363,6 +375,7 @@ class Yeetrbot:
             err = "An unexpected error occurred while attempting this operation: "
             return err + exc.args[0]
         else:
+            print(command)
             return f"Command {name!r} was edited successfully."
 
     def _delete_command(self, cmd):
