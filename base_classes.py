@@ -8,7 +8,7 @@ from collections import namedtuple
 import sqlite3
 from textwrap import dedent
 from typing import Callable, Sequence
-from db._create_tables import _create_tables
+# from db._create_tables import _create_tables
 import my_commands.built_ins as built_in_commands
 # import my_commands.default_commands as default_commands
 from my_commands import string_commands
@@ -16,7 +16,8 @@ from my_commands import string_commands
 # from dotenv import load_dotenv
 import parse_cmd
 
-_db_file = "db/botdb.db"
+
+_db_file = "db/bot.db"
 
 
 class AssignmentError(Exception): ...
@@ -107,8 +108,10 @@ class Yeetrbot:
         self._db_conn = sqlite3.connect(db_file)
         self._db = self._db_conn.cursor()
         with self._db_conn:
-            for stmt in _create_tables:
-                self._db.execute(stmt)
+            with open('db/schema.sql', 'r') as f:
+                self._db.executescript(f.read())
+            #for stmt in _create_tables:
+                #self._db.execute(stmt)
         self._built_ins = {k: v for k, v in built_in_commands.__dict__.items()
                            if isinstance(v, Callable)}
         self.built_ins = [f.__name__ for f in self._built_ins.values()
@@ -370,7 +373,7 @@ class Yeetrbot:
         placehds = ','.join(['?'] * len(command._fields))
         cond = f"(channel_id, name) = ({channel_id}, {name!r})"
         _sql = f"update command set({columns}) = ({placehds}) where {cond}"
-        print(_sql)
+
         try:
             with self._db_conn:
                 self._db.execute(_sql, command)

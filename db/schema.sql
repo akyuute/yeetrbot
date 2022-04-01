@@ -1,25 +1,14 @@
-# import sqlite3
+pragma foreign_keys = on;
+pragma journal_mode = off;
+pragma synchronous = off;
 
-# connection = sqlite3.connect('test_db.db')
-# c = connection.cursor()
-
-# c.execute("drop table channel, user_in_channel, channel_var, user_channel_data, command_registration, user_cmd_count")
-
-_create_tables = [
-"pragma foreign_keys = on;"
-, "pragma journal_mode = off;"
-, "pragma synchronous = off;"
-
-, """
 create table if not exists chatter (
     id integer primary key
     , name text unique not null
     , display_name text unique not null
     , history text
 );
-"""
 
-, """
 create table if not exists channel (
     id integer primary key
     -- id text primary key
@@ -27,9 +16,7 @@ create table if not exists channel (
     , display_name text unique not null
     -- , history text
 );
-"""
 
-, """
 create table if not exists user_presence (
     id integer unique not null
     , user_id integer not null
@@ -38,9 +25,7 @@ create table if not exists user_presence (
     , foreign key(user_id) references chatter(id)
     , foreign key(channel_id) references channel(id)
 );
-"""
 
-, """
 create table if not exists user_chan_data (
     presence_id integer primary key
     , rank text
@@ -49,16 +34,12 @@ create table if not exists user_chan_data (
     , history text
     , foreign key(presence_id) references user_presence(id)
 );
-"""
 
-,"""
 create table if not exists variable (
     id integer primary key
     , var_name text unique not null
 );
-"""
 
-,"""
 create table if not exists chan_var (
     id integer primary key
     , channel_id integer not null
@@ -67,9 +48,7 @@ create table if not exists chan_var (
     , foreign key(channel_id) references channel(id)
     , foreign key(var_id) references variable(id)
 );
-"""
 
-,"""
 create table if not exists user_var (
     id integer primary key
     , user_id integer not null
@@ -78,9 +57,6 @@ create table if not exists user_var (
     , foreign key(user_id) references chatter(id)
     , foreign key(var_id) references variable(id)
 );
-"""
-
-, """
 
 create table if not exists command (
     id integer primary key
@@ -100,9 +76,7 @@ create table if not exists command (
     , mtime text -- not null
     , foreign key(channel_id) references channel(id)
 );
-"""
 
-, """
 create table if not exists user_cmd_data (
     user_id integer not null
     , cmd_id integer not null
@@ -111,5 +85,3 @@ create table if not exists user_cmd_data (
     , foreign key(cmd_id) references command(id)
     , primary key(user_id, cmd_id)
 );
-"""
-]
