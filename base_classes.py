@@ -2,7 +2,7 @@
 from twitchio.ext.commands import Context
 # from twitchio import channel, chatter, FollowEvent, ChannelInfo, Clip, User
 import random
-# import re
+import re
 # import os
 from collections import namedtuple
 import sqlite3
@@ -80,6 +80,7 @@ class Yeetrbot:
             return
 
         msg: str = message.content
+        # msg: str = re.split(r'PRIVMSG\s\#\w+\s:', message.raw_data, 1)[1]
         # Do imdad():
         if msg[:6].lower().startswith(("i'm ", "i am ", "im ")):
             if random.random() < 0.2:
@@ -89,13 +90,16 @@ class Yeetrbot:
         await self.handle_commands(message)
 
     async def _global_before_invoke(self, ctx: Context):
-        # Set some useful values as Context attributes:
-        channel = await ctx.channel.user()
-        ctx.cmd, _, ctx.msg = ctx.message.content.partition(' ')
+        '''Sets some useful values as Context attributes.'''
+        # TwitchIO splits and re-joins message content internally.
+        # To preserve message whitespace, regex the raw data from Twitch:
+        raw = re.split(r'PRIVMSG\s\#\w+\s:', ctx.message.raw_data, 1)[1]
+        ctx.cmd, ctx.msg = raw.split(' ', 1)
         ctx.author_id = int(ctx.author.id)
+        channel = await ctx.channel.user()
         ctx.chan_as_user = channel
         # ctx.channel_copy = self.regd_channels.get(channel.id)
-        print(ctx.cmd, channel.id, channel.display_name)
+        print(channel.display_name, ctx.cmd, ctx.msg)
 
     @property
     def channels(self):
@@ -232,8 +236,6 @@ class Yeetrbot:
                 raise parse_cmd.InvalidAction(err)
         elif prefixless in action_switch:
             action = action_switch[prefixless]
-        print("Action=", action)
-        print("Msg=", msg)
 
         parsed = parse_cmd.parse(msg=(action + ' ' + msg))
 
@@ -249,16 +251,12 @@ class Yeetrbot:
             message = None
 
         cmd = vars(cmd_info)
-        # print("1: ", cmd)
         channel_id = cmd['channel_id'] = ctx.chan_as_user.id
         # `cmd` will only have 'name' with 'add' or 'edit' actions.
         # 'name' will be a tuple when parsed; make it a str or None:
         cmd['message'] = message
         cmd['author_id'] = ctx.author_id
         cmd['used_shortcut'] = prefixless in action_switch
-        # self.regd_channels[channel_id].commands[cmd['name']]['latest_modif'] = {
-            # 'author_id': cmd['author_id'], 'used_shortcut': prefixless in action_switch
-            # }
 
         aliases = cmd.get('aliases')
         if aliases:
@@ -268,11 +266,10 @@ class Yeetrbot:
                 continue
             cmd[k] = cmd.get(k, [None])[0]
 
-        # print("2: ", cmd)
         for k, v in tuple(cmd.items()):
             if v is None:
                 del cmd[k]
-        print(cmd)
+        # print(cmd)
 
         if action in action_switch.values():
             return func_switch[action](cmd)
@@ -383,7 +380,6 @@ class Yeetrbot:
         except Exception as exc:
             err = "An unexpected error occurred while attempting this operation: "
             return err + exc.args[0]
-        print(command)
         return f"Command {name!r} was edited successfully."
 
     def _delete_command(self, cmd):
