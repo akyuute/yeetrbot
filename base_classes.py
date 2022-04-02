@@ -94,7 +94,7 @@ class Yeetrbot:
         # TwitchIO splits and re-joins message content internally.
         # To preserve message whitespace, regex the raw data from Twitch:
         raw = re.split(r'PRIVMSG\s\#\w+\s:', ctx.message.raw_data, 1)[1]
-        ctx.cmd, ctx.msg = raw.split(' ', 1)
+        ctx.cmd, _, ctx.msg = raw.partition(' ')
         ctx.author_id = int(ctx.author.id)
         channel = await ctx.channel.user()
         ctx.chan_as_user = channel
@@ -328,7 +328,8 @@ class Yeetrbot:
 
     def _edit_command(self, cmd: dict):
         '''Alters a custom command's properties in memory and the database.'''
-        name = cmd['name']
+        name = cmd.get('name')
+        names = cmd.get('commands')
         new_name = cmd.get('new_name')
         channel_id = cmd['channel_id']
         used_shortcut = cmd['used_shortcut']
@@ -382,7 +383,37 @@ class Yeetrbot:
 
     def _delete_command(self, cmd):
         # error_preface = f"Unable to delete command {cmd['name']!r}: "
-        pass
+        print(cmd)
+        channel_id = cmd['channel_id']
+        names = set(cmd.get('commands'))
+        plur = ("s", "were") if len(names) > 1 else ("", "was")
+        error_preface = f"Failed to delete {len(names)} command{plur[0]}: "
+        err = ''
+
+        for name in names:
+            if name in self.regd_channels[channel_id].commands:
+                del self.regd_channels[channel_id].commands[name]
+            elif name in self.built_ins:
+                err = f"""
+                Command {name!r} is a built-in command. It cannot be deleted,
+                but you may disable it with '!disable {name}'."""
+            else:
+                err = f"Command {name!r} does not exist."
+            if err:
+                raise LookupError(error_preface + dedent(err))
+
+        _sql = "delete from command where (channel_id, name) = (?, ?)"
+        try:
+            with self._db_conn:
+                self._db.executemany(_sql, [(channel_id, n) for n in names])
+        except sqlite3.Error as exc:
+            err = f"Database error: {exc.args[0]}"
+            raise DatabaseError(error_preface + err)
+        except Exception as exc:
+            err = "An unexpected error occurred while attempting this operation: "
+            return error_preface + err + exc.args[0]
+        resp = f"{len(names)} command{plur[0]} {plur[1]} deleted successfully."
+        return dedent(resp)
 
     def register_variable(self, varname: str):
         # _sql = "insert into variable(var_name) values (?)"
