@@ -220,8 +220,6 @@ class Yeetrbot:
         action = ''
         msg = ctx.msg
         body = ctx.msg.split(None, 1)
-        print("msg=", msg)
-        print("body=", body)
         # if len(body) != 2:
             # try:
                 # return parse_cmd.parse(body[0])
@@ -269,7 +267,6 @@ class Yeetrbot:
         for k, v in tuple(cmd.items()):
             if v is None:
                 del cmd[k]
-        # print(cmd)
 
         if action in action_switch.values():
             return func_switch[action](cmd)
@@ -316,7 +313,6 @@ class Yeetrbot:
             cmd.setdefault(k, v)
 
         command = RegisteredCommand(**cmd)
-        print("New command:", command)
         self.regd_channels[channel_id].commands[name] = command
         fields = ','.join(command._fields)
         vals = ','.join(['?'] * len(command._fields))
@@ -327,6 +323,7 @@ class Yeetrbot:
         except sqlite3.Error as exc:
             err = f"DatabaseError: "
             raise DatabaseError(error_preface + err + exc.args[0])
+        print("Added:", command)
         return f"Command {name!r} was added successfully."
 
     def _edit_command(self, cmd: dict):
@@ -380,6 +377,7 @@ class Yeetrbot:
         except Exception as exc:
             err = "An unexpected error occurred while attempting this operation: "
             return err + exc.args[0]
+        print("Edited:", command)
         return f"Command {name!r} was edited successfully."
 
     def _delete_command(self, cmd):

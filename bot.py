@@ -97,6 +97,7 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
             # await ctx.send(f"{ctx.author.mention}: ")
         try:
             resp = self._manage_custom_command(ctx)
+            print("Response:", resp)
         except base_classes.RegistrationError as exc:
             resp = exc.args[0]
             print("Registration error:", resp)
@@ -109,10 +110,13 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         except TypeError as exc:
             resp = exc.args[0]
             print("Type error:", resp)
+        except Exception as exc:
+            print("Unexpected error:")
+            print(exc, exc.args[0])
+            print("Response:", resp)
         else:
             print(dedent(resp))
         await ctx.send(f"{ctx.author.mention}: {dedent(resp)}")
-
 
     @commands.command(name="testmsg")
     async def command_testmsg(self, ctx: commands.Context):
