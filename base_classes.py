@@ -99,7 +99,7 @@ class Yeetrbot:
         channel = await ctx.channel.user()
         ctx.chan_as_user = channel
         # ctx.channel_copy = self.regd_channels.get(channel.id)
-        print(channel.display_name, ctx.cmd, ctx.msg)
+        print("--> ", channel.display_name, ctx.cmd, ctx.msg)
 
     @property
     def channels(self):
@@ -210,8 +210,8 @@ class Yeetrbot:
             'add': self._add_command,
             'edit': self._edit_command,
             'delete': self._delete_command,
-            'disable': self._edit_command,
-            'enable': self._edit_command,
+            'disable': self._toggle_command,
+            'enable': self._toggle_command,
             # 'alias': self._edit_command
         }
 
@@ -236,6 +236,7 @@ class Yeetrbot:
             action = action_switch[prefixless]
 
         parsed = parse_cmd.parse(msg=(action + ' ' + msg))
+        # print("Parsed:", parsed)
 
         if isinstance(parsed, tuple):
             cmd_info, message = parsed
@@ -253,6 +254,7 @@ class Yeetrbot:
         # `cmd` will only have 'name' with 'add' or 'edit' actions.
         # 'name' will be a tuple when parsed; make it a str or None:
         cmd['message'] = message
+        cmd['action'] = action
         cmd['author_id'] = ctx.author_id
         cmd['used_shortcut'] = prefixless in action_switch
 
@@ -277,11 +279,11 @@ class Yeetrbot:
         error_preface = f"Failed to register command {name!r}: "
         err = ""
         channel_id = cmd['channel_id']
-        channel = self.regd_channels[channel_id]
+        commands = self.regd_channels[channel_id].commands
         used_shortcut = cmd['used_shortcut']
-        del cmd['used_shortcut']
+        del cmd['used_shortcut'], cmd['action']
 
-        if name in channel.commands:
+        if name in commands:
             err = f"""
             Command already exists.
             To change its message or properties, use
@@ -324,23 +326,24 @@ class Yeetrbot:
             err = f"DatabaseError: "
             raise DatabaseError(error_preface + err + exc.args[0])
         print("Added:", command)
-        return f"Command {name!r} was added successfully."
+        return f"Successfully added command {name!r}."
 
     def _edit_command(self, cmd: dict):
         '''Alters a custom command's properties in memory and the database.'''
-        name = cmd.get('name')
-        names = cmd.get('commands')
-        new_name = cmd.get('new_name')
         channel_id = cmd['channel_id']
+        commands = self.regd_channels[channel_id].commands
+        name = cmd.get('name')
+        new_name = cmd.get('new_name')
+        action = cmd.get('action')
         used_shortcut = cmd['used_shortcut']
-        del cmd['used_shortcut']
+        del cmd['action'], cmd['used_shortcut']
         channel = self.regd_channels[channel_id]
         error_preface = f"Falied to update command {name!r}: "
         err = ""
 
-        if name not in channel.commands:
+        if name not in commands and name is not None:
             err = "This command does not exist. Use '!addcmd' to add it."
-        elif new_name in channel.commands:
+        elif new_name in commands:
             err = f"""
             Naming conflict: The name {new_name!r} matches another command with
             the same name. Please find a different new name for {name!r}."""
@@ -352,16 +355,14 @@ class Yeetrbot:
             delete the custom command."""
         if err:
             raise RegistrationError(error_preface + dedent(err))
-
-        old_command = channel.commands[name]._asdict()
+        
+        command = commands[name]._replace(**cmd)
         if new_name:
             store_as = cmd['name'] = new_name
             del cmd['new_name']
             del self.regd_channels[channel_id].commands[name]
         else:
             store_as = name
-        old_command.update(cmd)
-        command = RegisteredCommand(**old_command)
         self.regd_channels[channel_id].commands[store_as] = command
 
         columns = ','.join(command._fields)
@@ -379,15 +380,59 @@ class Yeetrbot:
             err = "An unexpected error occurred while attempting this operation: "
             return err + exc.args[0]
         print("Edited:", command)
-        return f"Command {name!r} was edited successfully."
+        return f"Successfully updated command {name!r}."
+
+
+    def _toggle_command(self, cmd: dict):
+        '''Disable or enable a command by updating
+        the database and in-memory dataclasses.'''
+        channel_id = cmd['channel_id']
+        commands = self.regd_channels[channel_id].commands
+        names = cmd.get('commands')
+        count = len(names)
+        plur = "s" if count > 1 else ""
+
+        action = cmd.get('action')
+        actions = ('disable', 'enable')
+        if action not in actions:
+            err = f"Failed to perform operation: Invalid action: {action!r}"
+            raise parse_cmd.InvalidAction(err)
+        error_preface = f"Failed to {action} command{plur}: "
+
+        toggles = []
+        for name in names:
+            if name in commands:
+                toggle = actions.index(action)
+                old_command = commands[name]
+                command = old_command._replace(is_enabled=toggle)
+                self.regd_channels[channel_id].commands[name] = command
+                toggles.append(toggle)
+            else:
+                err = f"Command {name!r} does not exist."
+                raise LookupError(error_preface + err)
+
+            pairs = [(channel_id, n) for n in names]
+            cond = "(channel_id, name) = (?, ?)"
+            _sql = f"update command set (is_enabled) = {toggle} where {cond}"
+            try:
+                with self._db_conn:
+                    self._db.executemany(_sql, pairs)
+            except sqlite3.Error as exc:
+                err = "Database error: "
+                raise DatabaseError(error_preface + err + exc.args[0])
+        desc = f"{count} command{plur}" if plur else f"command {names[0]!r}"
+        resp = f"Successfully {action}d {desc}."
+        return resp
+
 
     def _delete_command(self, cmd):
-        # error_preface = f"Unable to delete command {cmd['name']!r}: "
+        '''Delete a command, update the database and in-memory dataclasses.'''
         print(cmd)
         channel_id = cmd['channel_id']
         names = set(cmd.get('commands'))
-        plur = ("s", "were") if len(names) > 1 else ("", "was")
-        error_preface = f"Failed to delete {len(names)} command{plur[0]}: "
+        count = len(names)
+        plur = "s" if count > 1 else ""
+        error_preface = f"Failed to delete {len(names)} command{plur}: "
         err = ''
 
         for name in names:
@@ -402,18 +447,20 @@ class Yeetrbot:
             if err:
                 raise LookupError(error_preface + dedent(err))
 
+        pairs = [(channel_id, n) for n in names]
         _sql = "delete from command where (channel_id, name) = (?, ?)"
         try:
             with self._db_conn:
-                self._db.executemany(_sql, [(channel_id, n) for n in names])
+                self._db.executemany(_sql, pairs)
         except sqlite3.Error as exc:
             err = f"Database error: {exc.args[0]}"
             raise DatabaseError(error_preface + err)
         except Exception as exc:
             err = "An unexpected error occurred while attempting this operation: "
             return error_preface + err + exc.args[0]
-        resp = f"{len(names)} command{plur[0]} {plur[1]} deleted successfully."
-        return dedent(resp)
+        desc = f"{count} command{plur}" if plur else f"command {names.pop()!r}"
+        resp = f"Successfully deleted {desc}."
+        return resp
 
     def register_variable(self, varname: str):
         # _sql = "insert into variable(var_name) values (?)"
