@@ -5,14 +5,26 @@ parser = argparse.ArgumentParser(prog='!cmd', description='CMD DESC', exit_on_er
 subparsers = parser.add_subparsers(help="Help for all subcommands here.")
 
 cmd_add_or_edit = subparsers.add_parser('!cmd', add_help=False)
-cmd_add_or_edit.set_defaults(is_enabled=None)
+
+#args = {
+#    'perms': (('--perms', '-'), {'choices': "everyone vip moderator owner rank=".split(), 'type': lambda s: s.lower()}),
+#    'aliases': (('--aliases', '-a'), {'nargs': 1}),
+#    'count': (('--count', '-c'), {'type': int}),
+#    'disable': (('--disable', '-d'), {'action': 'store_const', }),
+#    'hidden': (('--hidden', '-i'), {}),
+#    'override': (('--override_builtin'), {}),
+#    'enable': (('--enable', 'e'), {}),
+#    'unhidden': (('--unhidden', '-u'), {}),
+#    'rename': (('--rename', '-r'), {}),
+#}
+
 
 cmd_add_or_edit.add_argument('name', nargs=1)
 cmd_add_or_edit.add_argument('--perms', '-p', choices="everyone vip moderator owner rank=".split(), type=lambda s: s.lower())
 cmd_add_or_edit.add_argument('--aliases', '-a', nargs=1)
 cmd_add_or_edit.add_argument('--count', '-c', type=int)
 cmd_add_or_edit.add_argument('--disable', '-d', action='store_const', const=0, dest='is_enabled')
-cmd_add_or_edit.add_argument('--hide', '-i', action='store_const', const=1, dest='is_hidden')
+cmd_add_or_edit.add_argument('--hidden', '-i', action='store_const', const=1, dest='is_hidden')
 cmd_add_or_edit.add_argument('--override_builtin', action='store_const', const=1)
 
 cmd_add = subparsers.add_parser('add', parents=[cmd_add_or_edit], exit_on_error=False, description="Add a new custom command.", help="ADD HELP")
@@ -20,8 +32,8 @@ cmd_add = subparsers.add_parser('add', parents=[cmd_add_or_edit], exit_on_error=
 cmd_edit = subparsers.add_parser('edit', parents=[cmd_add_or_edit], exit_on_error=False, description="Edit a custom command's message and properties.", help="EDIT HELP")
 
 cmd_edit.add_argument('--enable', '-e', action='store_const', const=1, dest='is_enabled')
-cmd_edit.add_argument('--unhide', '-u', action='store_const', const=0, dest='is_hidden')
-cmd_edit.add_argument('--rename', '-r', nargs=1, default=None, dest='new_name')
+cmd_edit.add_argument('--unhidden', '-u', action='store_const', const=0, dest='is_hidden')
+cmd_edit.add_argument('--rename', '-r', nargs=1, dest='new_name')
 
 other_actions = subparsers.add_parser('!cmd', add_help=False)
 other_actions.add_argument('commands', nargs='+')
@@ -48,16 +60,16 @@ def parse(msg: str, parser: argparse.ArgumentParser = parser):
     if args[0] in ('delete', 'enable', 'disable'):
         # try:
         result = parser.parse_args(args)
-        print(f"{result=}")
+        # print(f"{result=}")
         return result
         # except argparse.ArgumentError as exc:
             # raise InvalidArgument
 
     num_parsed = 1
     last_result: argparse.Namespace = None
-    valid_flags = ('--help', '-h', '--permissions', '-p', '--aliases', '-a', '--count', '-c', '--hide', '-i', '--disable', '-d',  )
+    valid_flags = ('--help', '-h', '--permissions', '-p', '--aliases', '-a', '--count', '-c', '--hidden', '-i', '--disable', '-d',  )
     if args[0] == 'edit':
-        valid_flags += ('--rename', '-r', '--enable', '-e', '--unhide', '-u', )
+        valid_flags += ('--rename', '-r', '--enable', '-e', '--unhidden', '-u', )
 
     for i, _ in enumerate(args):
         try:
@@ -71,7 +83,8 @@ def parse(msg: str, parser: argparse.ArgumentParser = parser):
             if args[i] in ('--help', '-h'):
                 return parser.print_help()
             # Is the next pair of args invalid, meaning the beginning of the message?
-            if not any(a in valid_flags for a in args[i+1:i+3]):
+            if set(valid_flags).isdisjoint(set(args[i+1:i+3])):
+            #if not any(a in valid_flags for a in args[i+1:i+3]):
                 # Disregard if this is just the command name:
                 if i < 3:
                     continue
