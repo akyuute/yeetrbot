@@ -11,6 +11,7 @@ from textwrap import dedent
 from parse_cmd import InvalidAction, InvalidArgument, InvalidSyntax
 import base_classes
 from my_commands import string_commands
+import bot_methods
 # from my_commands.string_commands import derp, uwu, uhm
 #from alpha.eng_funcs import EngFuncs as eng
 #eng = EngFuncs()
@@ -46,9 +47,9 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         # print(self.channels)
         # print(self.com)
 
-        self.global_before_invoke = self._global_before_invoke
-        self.event_message = self._event_message
-        self.event_ready = self._event_ready
+        self.global_before_invoke = bot_methods.global_before_invoke
+        self.event_message = bot_methods.event_message
+        self.event_ready = bot_methods.event_ready
 
 
 
@@ -109,7 +110,7 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         except (InvalidArgument, InvalidSyntax, InvalidAction) as exc:
             resp = exc.args[0]
             print("Parsing error:", resp)
-        except TypeError as exc:
+        except NotImplementedError as exc:
             resp = exc.args[0]
             print("Type error:", resp)
         except Exception as exc:
