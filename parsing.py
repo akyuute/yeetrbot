@@ -1,6 +1,6 @@
-import argparse
+from import ArgumentParser, Namespace, ArgumentError
 
-parser = argparse.ArgumentParser(prog='!cmd', description='CMD DESC', exit_on_error=False)
+parser = ArgumentParser(prog='!cmd', description='CMD DESC', exit_on_error=False)
 
 subparsers = parser.add_subparsers(help="Help for all subcommands here.")
 
@@ -49,24 +49,20 @@ class InvalidSyntax(Exception): ...
 class InvalidAction(Exception): ...
 
 
-def parse(msg: str, parser: argparse.ArgumentParser = parser):
-    '''Parses a !cmd add or !cmd edit command
-    and returns new data and message.'''
+def parse_cmd(msg: str, parser: ArgumentParser = parser) -> tuple|Namespace:
+    '''Parses a !cmd argument string, returns new data and message.'''
     args = msg.split()
     if len(args) < 2:
         if '-h' in args or '--help' in args:
             return parser.print_help()
         raise InvalidSyntax("Syntax Error: Not enough arguments. <!cmd syntax info>")
     if args[0] in ('delete', 'enable', 'disable'):
-        # try:
         result = parser.parse_args(args)
         # print(f"{result=}")
         return result
-        # except argparse.ArgumentError as exc:
-            # raise InvalidArgument
 
     num_parsed = 1
-    last_result: argparse.Namespace = None
+    last_result: Namespace = None
     valid_flags = ('--help', '-h', '--permissions', '-p', '--aliases', '-a', '--count', '-c', '--hidden', '-i', '--disable', '-d',  )
     if args[0] == 'edit':
         valid_flags += ('--rename', '-r', '--enable', '-e', '--unhidden', '-u', )
@@ -93,7 +89,7 @@ def parse(msg: str, parser: argparse.ArgumentParser = parser):
             if i > 2:
                 raise InvalidArgument(f"Invalid argument: {args[i]!r}")
 
-        except argparse.ArgumentError as exc:
+        except ArgumentError as exc:
             # If the command lacks a message, begins with anything that can be interpreted
             # as a flag, it will be considered a syntax error:
             #if args[i] not in valid_flags:
