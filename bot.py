@@ -8,7 +8,7 @@ import csv
 import atexit
 from dotenv import load_dotenv
 from textwrap import dedent
-from parse_cmd import InvalidAction, InvalidArgument, InvalidSyntax
+from errors import *
 import base_classes
 from my_commands import string_commands
 import bot_methods
@@ -83,8 +83,11 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
     async def command_join(self, ctx: commands.Context):
         if ctx.chan_as_user.id != self.user_id:
             return
-        resp, username = self._join_channel(ctx)
-        await self.join_channels([username])
+        try:
+            resp = self._join_channel(ctx)
+        except RegistrationError as exc:
+            resp = exc.args[0]
+        await self.join_channels([ctx.author.name])
         await ctx.send(f"{ctx.author.mention}: {resp}")
 
     @commands.command(name='cmd', aliases=('addcmd', 'editcmd', 'delcmd', 'disable', 'enable'))
@@ -98,15 +101,15 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
             # await ctx.send(f"{ctx.author.mention}: ")
         try:
             resp = self._manage_custom_command(ctx)
-        except base_classes.RegistrationError as exc:
+        except RegistrationError as exc:
             resp = exc.args[0]
             print("Registration error:", resp)
-        except LookupError as exc:
+        except (ChannelNotFoundError, CommandNotFoundError) as exc:
             resp = exc.args[0]
-            print("Lookup error", resp)
+            print("Lookup error:", resp)
         except base_classes.DatabaseError as exc:
             resp = exc.args[0]
-            print("Database error", resp)
+            print("Database error:", resp)
         except (InvalidArgument, InvalidSyntax, InvalidAction) as exc:
             resp = exc.args[0]
             print("Parsing error:", resp)

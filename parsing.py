@@ -1,10 +1,35 @@
-from import ArgumentParser, Namespace, ArgumentError
+'''Functions for parsing config files, values and command strings.'''
 
-parser = ArgumentParser(prog='!cmd', description='CMD DESC', exit_on_error=False)
+from configparser import ConfigParser
+from argparse import ArgumentParser, Namespace, ArgumentError
 
-subparsers = parser.add_subparsers(help="Help for all subcommands here.")
 
-cmd_add_or_edit = subparsers.add_parser('!cmd', add_help=False)
+class InvalidArgument(Exception):
+    '''Error raised when a parsed argument is counted as invalid.'''
+    pass
+
+class InvalidSyntax(Exception):
+    '''Error raised when the syntax of a series of arguments is invalid.'''
+    pass
+
+class InvalidAction(Exception):
+    '''Error raised when the first argument of a
+    command string does not match a valid action.'''
+    pass
+
+def interpret_bool(value: str):
+    truthy = "true t yes y on 1".split()
+    falsy = "false f no n off 0".split()
+    pattern = value.lower()
+    if pattern not in truthy + falsy:
+        raise ValueError(f"Invalid argument: {pattern!r}")
+    match = pattern in truthy or not pattern in falsy
+    return match
+
+file = "bot_config.ini"
+config = ConfigParser(empty_lines_in_values=False)
+bot_config = config.read(file)
+
 
 #args = {
 #    'perms': (('--perms', '-'), {'choices': "everyone vip moderator owner rank=".split(), 'type': lambda s: s.lower()}),
@@ -19,6 +44,10 @@ cmd_add_or_edit = subparsers.add_parser('!cmd', add_help=False)
 #}
 
 
+parser = ArgumentParser(prog='!cmd', description='CMD DESC', exit_on_error=False)
+subparsers = parser.add_subparsers(help="Help for all subcommands here.")
+
+cmd_add_or_edit = subparsers.add_parser('!cmd', add_help=False)
 cmd_add_or_edit.add_argument('name', nargs=1)
 cmd_add_or_edit.add_argument('--perms', '-p', choices="everyone vip moderator owner rank=".split(), type=lambda s: s.lower())
 cmd_add_or_edit.add_argument('--aliases', '-a', nargs=1)
@@ -42,11 +71,6 @@ cmd_delete = subparsers.add_parser('delete', parents=[other_actions], exit_on_er
 cmd_disable = subparsers.add_parser('disable', parents=[other_actions], exit_on_error=False, description="Disable commands.", help="Multiple commands may be disabled at once.")
 cmd_enable = subparsers.add_parser('enable', parents=[other_actions], exit_on_error=False, description="Enable commands.", help="Multiple commands may be enabled at once.")
 cmd_alias = subparsers.add_parser('alias', parents=[other_actions], exit_on_error=False, description="Set command aliases.", help="Specify one or more aliases for a given command.")
-
-
-class InvalidArgument(Exception): ...
-class InvalidSyntax(Exception): ...
-class InvalidAction(Exception): ...
 
 
 def parse_cmd(msg: str, parser: ArgumentParser = parser) -> tuple|Namespace:
