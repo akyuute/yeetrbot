@@ -26,10 +26,6 @@ def interpret_bool(value: str):
     match = pattern in truthy or not pattern in falsy
     return match
 
-file = "bot_config.ini"
-config = ConfigParser(empty_lines_in_values=False)
-bot_config = config.read(file)
-
 
 #args = {
 #    'perms': (('--perms', '-'), {'choices': "everyone vip moderator owner rank=".split(), 'type': lambda s: s.lower()}),

@@ -9,7 +9,7 @@ import atexit
 from dotenv import load_dotenv
 from textwrap import dedent
 from errors import *
-import base_classes
+import base_classes_dict_for_default
 from my_commands import string_commands
 import bot_methods
 # from my_commands.string_commands import derp, uwu, uhm
@@ -102,22 +102,21 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         try:
             resp = self._manage_custom_command(ctx)
         except RegistrationError as exc:
-            resp = exc.args[0]
             print("Registration error:", resp)
         except (ChannelNotFoundError, CommandNotFoundError) as exc:
-            resp = exc.args[0]
+            resp = dedent(exc.args[0])
             print("Lookup error:", resp)
         except base_classes.DatabaseError as exc:
-            resp = exc.args[0]
+            resp = dedent(exc.args[0])
             print("Database error:", resp)
         except (InvalidArgument, InvalidSyntax, InvalidAction) as exc:
-            resp = exc.args[0]
+            resp = dedent(exc.args[0])
             print("Parsing error:", resp)
         except NotImplementedError as exc:
-            resp = exc.args[0]
+            resp = dedent(exc.args[0])
             print("Type error:", resp)
         except Exception as exc:
-            resp = "Unexpected error: " + exc.args[0]
+            resp = "Unexpected error: " + dedent(exc.args[0])
             print("Unexpected error:", resp)
         # else:
             # print("Response:", dedent(resp))
