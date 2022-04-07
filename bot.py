@@ -3,13 +3,14 @@
 from twitchio.ext import commands
 # from twitchio import channel, chatter, FollowEvent, ChannelInfo, Clip, User
 import random
+import re
 import os
 import csv
 import atexit
 from dotenv import load_dotenv
 from textwrap import dedent
 from errors import *
-from base_classes_dict_for_default import Yeetrbot
+from base_classes import Yeetrbot
 from my_commands import string_commands
 import bot_methods
 # from my_commands.string_commands import derp, uwu, uhm
@@ -47,12 +48,6 @@ class ChatBot(commands.Bot, Yeetrbot):
         # print(self.channels)
         # print(self.com)
 
-        self.global_before_invoke = bot_methods.global_before_invoke
-        self.event_message = bot_methods.event_message
-        self.event_ready = bot_methods.event_ready
-
-
-
         # Yeetrbot.__init__(self)
         # commands.Bot.__init__(self,
         super().__init__(
@@ -65,6 +60,50 @@ class ChatBot(commands.Bot, Yeetrbot):
             # initial_channels=self.channels
             )
         # self.channels = ENV['INITIAL_CHANNELS']
+
+        #self.global_before_invoke = bot_methods.global_before_invoke
+        #self.event_message = bot_methods.event_message
+        #self.event_ready = bot_methods.event_ready
+
+    async def event_ready(self):
+        '''Have the bot do things upon connection to the Twitch server.'''
+        print(f"{self.display_name} is online!")
+        # Post a message in each registered channel's chat upon connection:
+        # for channel in self.connected_channels:
+        # notify = f"{self.display_name} is online!"
+        #     await self.get_channel(channel).send(msg)
+        #     pass
+
+    # Maybe add this and other event handlers to a cog in bot.py:
+    async def event_message(self, message):
+        # Messages sent by the bot have `echo` = True.
+        # Ignore bot messages:
+        if message.echo:
+            return
+
+        msg: str = message.content
+        # msg: str = re.split(r'PRIVMSG\s\#\w+\s:', message.raw_data, 1)[1]
+        # Do imdad():
+        if msg[:6].lower().startswith(("i'm ", "i am ", "im ")):
+            if random.random() < 0.2:
+                await message.channel.send(string_commands.imdad(msg))
+        # Channel triggers and keywords can eventually be handled here as well.
+
+        await self.handle_commands(message)
+
+    async def global_before_invoke(self, ctx: commands.Context):
+        '''Sets some useful values as Context attributes.'''
+        # TwitchIO splits and re-joins message content internally.
+        # To preserve message whitespace, regex the raw data from Twitch:
+        raw = re.split(r'PRIVMSG\s\#\w+\s:', ctx.message.raw_data, 1)[1]
+        ctx.cmd, _, ctx.msg = raw.partition(' ')
+        ctx.author_id = int(ctx.author.id)
+        channel = await ctx.channel.user()
+        ctx.chan_as_user = channel
+        # ctx.channel_copy = self._registry.get(channel.id)
+        print("--> ", channel.display_name, ctx.cmd, ctx.msg)
+
+
 
 
     # @property
@@ -117,7 +156,8 @@ class ChatBot(commands.Bot, Yeetrbot):
             print("Type error:", resp)
         except Exception as exc:
             resp = "Unexpected error: " + dedent(exc.args[0])
-            print("Unexpected error:", resp)
+            raise
+            # print("Unexpected error:", resp)
         # else:
             # print("Response:", dedent(resp))
         print("Response:", dedent(resp))

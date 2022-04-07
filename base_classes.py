@@ -1,63 +1,58 @@
 # from twitchio.ext import commands
 from twitchio.ext.commands import Context
-import random
 import re
-import time
 # import os
-# import atexit
-
-#from collections import namedtuple
-import dataclasses
-from dataclasses import dataclass, fields, astuple, asdict
-from typing import Callable, Sequence
-
+import time
+import random
 import sqlite3
+# import atexit
 from textwrap import dedent
+#from collections import namedtuple
+import dataclasses as dc
+#from dataclasses import dataclass, dc.astuple, dc.asdict
+
 import my_commands.built_ins as built_in_commands
 # import my_commands.default_commands as default_commands
 from my_commands import string_commands
-import parse_cmd
+from parsing import parse_cmd
+from errors import *
+from typing import Callable, Sequence
 
 
-_db_file = "db/bot.db"
 
-
-class AssignmentError(Exception): ...
-class RegistrationError(AssignmentError): ...
-class DatabaseError(Exception): ...
-
-
-@dataclass # (slots=True)
+@dc.dataclass # (slots=True)
 class RegisteredCommand:
     channel_id: int
     name: str
-    message: str = dataclasses.field(repr=False)
-    aliases: list[str] = []
+    message: str = dc.field(repr=False)
+    author_id: int = dc.field(repr=False)
+    author_name: str = dc.field(repr=False)
+    # Times in seconds since epoch; use time.gmtime() to convert to UTC
+    ctime: int = dc.field(default=time.time(), repr=False)
+    mtime: int = dc.field(default=None, repr=False)
+    modified_by: str = dc.field(default=None, repr=False)
+    aliases: list[str] = dc.field(default_factory=list)
     perms: str = 'everyone'
     count: int = 0
-    is_hidden: bool = dataclasses.field(default=False)
-    is_enabled: bool = dataclasses.field(default=True)
-    author_id: int = dataclasses.field(repr=False)
-    author_name: str = dataclasses.field(repr=False)
-    modified_by: str = dataclasses.field(repr=False)
-    # Times in seconds since epoch; use time.gmtime() to convert to UTC
-    ctime: int = dataclasses.field(repr=False)
-    mtime: int = dataclasses.field(repr=False)
-    override_builtin: bool = field(default=None, repr=False)
+    is_hidden: bool = dc.field(default=False)
+    is_enabled: bool = dc.field(default=True)
+    override_builtin: bool = dc.field(default=None, repr=False)
 
 
-@dataclass(slots=True)
+@dc.dataclass  # (slots=True)
 class RegisteredChannel:
     channel_id: int
     username: str
     display_name: str
-    commands: RegisteredCommand
+    commands: dict = dc.field(default_factory=dict)
 
 
 class Yeetrbot:
     '''Contains methods for database exchanges and additional functionality.'''
+    db_file = "db/bot.db"
+
     def __init__(self):
-        self._init_database(_db_file)
+        self._init_database(__class__.db_file)
         self._init_channels()
         self._init_commands()
         # self._init_built_ins()
@@ -81,8 +76,8 @@ class Yeetrbot:
         #                  if not f.__name__.startswith('_')]
 
     def _init_channels(self):
-        '''Retrieves channel records from the database and initializes a
-        `RegisteredChannel` object for each.'''
+        '''Retrieves channel records from the database and
+        initializes a `RegisteredChannel` object for each.'''
         records = self._db.execute("select * from channel")
         self._registry = {}
         for record in records:
@@ -96,75 +91,80 @@ class Yeetrbot:
         return [c.username for c in self._registry.values()]
 
     def _init_commands(self):
-        '''Retrieves command records from the database and initializes a
-        `RegisteredCommand` object for each.'''
-        fields = ','.join(_command_field_names)
+        '''Retrieves command records from the database and
+        initializes a `RegisteredCommand` object for each.'''
+        fields = ','.join([f.name for f in dc.fields(RegisteredCommand)])
+        print(fields)
+        # fields = ','.join(dc.fields(RegisteredCommand))
         # cond = "where override_builtin = None"
         cond = ""
         _sql = f"select {fields} from command {cond}"
+        print(_sql)
         records = self._db.execute(_sql)
         for record in records:
             cmd = RegisteredCommand(*record)
             self._registry[cmd.channel_id].commands[cmd.name] = cmd
+ 
+    # def get_commands(self, channel_id: int):
+        # return [c.name for c in self._registry[channel_id].commands]
 
-    def _join_channel(self, ctx: Context):
-        '''Registers a new channel and adds it to the IRC bot's list of joined
-        channels when invoked within the bot's Twitch channel, then returns the
-        response and username for `commands.Bot.join_channels()`.'''
-        resp = ""
-        username = ctx.author.name
-        display_name = ctx.author.display_name
-        if ctx.author_id not in self._registry:
-            try:
-                # First, enter the channel into the database and memory:
-                self._register_channel(ctx.author_id, username, display_name)
-                # Then, add the channel to the IRC bot's joined channels list:
-                resp = "I've successfully joined your channel. See you there!"
-                print(f"Registered new channel {display_name}")
-                print(self._registry)
-            # except RegistrationError as exc:
-            #     resp = f"RegistrationError: {exc.args[0]}"
-            # except sqlite3.Error as exc:
-            #     resp = f"DatabaseError: {exc.args[0]}"
-            except Exception as exc:
-                print(exc.args[0])
-                resp = f"""
-                An unexpected error occurred while attempting to
-                join your channel: {exc.args[0]}"""
-        else:
-            resp = "I am already in your channel!"
-        return resp, username
 
     def _register_channel(self, uid: int, name: str, display_name: str):
         '''Registers a channel to the database if new, otherwise raises
-        `RegistrationError`. This must only be called by a command invoked in
-        the bot's channel.'''
+        `RegistrationError`. This must only be called by a command sent
+        in the bot's channel.'''
         if uid in self._registry:
-            err = f"Channel {name} is already registered."
+            err = f"Channel {name!r} is already registered."
             raise RegistrationError(err)
         channel = RegisteredChannel(uid, name, display_name)
+        # channel.commands = {}
         self._registry[uid] = channel
-        fields = 'id', 'name', 'display_name'
+        fields = ('id', 'name', 'display_name')
+        values = (uid, name, display_name)
         _sql = f"insert into channel({','.join(fields)}) values (?,?,?)"
         try:
             with self._db_conn:
-                self._db.execute(_sql, astuple(channel))
+                self._db.execute(_sql, values)
         except sqlite3.Error as exc:
-            err = f"Failed registering channel {name!r}: {exc.args[0]}"
-            raise DatabaseError(err)
+            raise DatabaseError(exc.args[0])
 
-    def _manage_custom_command(self, ctx: Context, built_in_name: str = 'cmd'):
+    def _join_channel(self, ctx: Context):
+        '''Registers a new channel to the database when invoked within
+        the bot's Twitch channel and returns the response to be sent.'''
+        resp = ""
+        username = ctx.author.name
+        display_name = ctx.author.display_name
+        error_preface = f"Failed registering channel {username!r}"
+
+        if ctx.author_id not in self._registry:
+            try:
+                self._register_channel(ctx.author_id, username, display_name)
+                resp = "I've successfully joined your channel. See you there!"
+                print(f"Registered new channel {display_name}")
+                print(self._registry)
+            except RegistrationError as exc:
+                err = f"{error_preface}: Registration error: {exc.args[0]}"
+                raise RegistrationError(err)
+            except DatabaseError as exc:
+                err = f"{error_preface}: Database error: {exc.args[0]}"
+                raise DatabaseError(err)
+        else:
+            resp = "I am already in your channel!"
+        return resp
+
+    def _manage_custom_command(self, ctx: Context, base_name: str = 'cmd',
+            alias_names="addcmd editcmd delcmd disable enable alias".split()):
         '''Parses a `!cmd` string and executes `_add_command()`,
         `_edit_command()` or `_delete_command()` based on the implied action.
         '''
-        chnlid = ctx.chan_as_user.id
-        if chnid not in self._registry:
-            err = f"Channel with id {chnid} is not registered."
-            raise RegistrationError(err)
+        channel_id = ctx.chan_as_user.id
+        if channel_id not in self._registry:
+            err = f"Channel with id {channel_id} is not registered."
+            raise ChannelNotFoundError(err)
 
-        action_switch = {a + built_in_name: a for a in 'add edit del'.split()}
-        action_switch.update({a: a for a in 'disable, enable, alias'.split()})
-        action_switch['del' + built_in_name] = 'delete'
+        # alias_names="addcmd editcmd delcmd disable enable alias".split()
+        actions = "add edit delete disable enable alias".split()
+        action_switch = dict(zip(alias_names, actions))
 
         func_switch = {
             'add': self._add_command,
@@ -182,20 +182,20 @@ class Yeetrbot:
         body = ctx.msg.split(None, 1)
         # if len(body) != 2:
             # try:
-                # return parse_cmd.parse(body[0])
+                # return parsing(body[0])
             # except Exception as exc:
                 # print("Parser exception...", exc)
                 # print(type(exc), exc.args[0])
-        if prefixless == built_in_name:
+        if prefixless == base_name:
             action, msg = body
             syntax = "<cmd syntax>"
             if action not in func_switch:
-                err = f"Syntax error: Invalid action: {action!r}. Syntax: {syntax}"
-                raise parse_cmd.InvalidAction(err)
+                err = f"Invalid action: {action!r}. Syntax: {syntax}"
+                raise InvalidAction(err)
         elif prefixless in action_switch:
             action = action_switch[prefixless]
 
-        parsed = parse_cmd.parse(msg=f"{action} {msg}")
+        parsed = parse_cmd(msg=f"{action} {msg}")
         # print("Parsed:", parsed)
 
         if isinstance(parsed, tuple):
@@ -203,197 +203,221 @@ class Yeetrbot:
             message = parsed[1]
         elif parsed is None:
             err = """
-            Parser returned NoneType, most likely resulting from a
-            --help flag. Those will be implemented soon!"""
+                Failed to perform requested operation:
+                Parser returned NoneType, most likely resulting
+                from a --help flag. Those will be implemented soon!"""
             raise NotImplementedError(err)
         else:
             cmd_dict = vars(parsed)
             message = None
 
+        print("cmd_dict=", cmd_dict)
+
+        aliases = cmd_dict.get('aliases')
+        name = cmd_dict.get('name')
+        used_alias = prefixless in action_switch
+
+        cmd_dict['channel_id'] = ctx.chan_as_user.id
+        cmd_dict['name'] = name[0] if name else None
+        # if cmd_dict.get('name'):
+            # cmd_dict['name'] = cmd_dict['name'][0]
         cmd_dict['message'] = message
-        cmd_dict['author_id'] = author_id
+        cmd_dict['aliases'] = aliases[0] if aliases else None
+        cmd_dict['author_id'] = ctx.author_id
+        cmd_dict['author_name'] = ctx.author.name
+        # cmd_dict['used_alias'] = used_alias
 
-        cmd = RegisteredCommand(**{k: v for k, v in cmd_dict if v is not None})
-        cmd.last_action = action
-        cmd.used_shortcut = used_shortcut
-        new_name = cmd_dict.get('new_name')
-        cmd.new_name = new_name
-
-        if action in action_switch.values():
+        if action in ('add', 'edit'):
+            # print(f"{cmd_dict=}")
+            cmd = RegisteredCommand(**{k: v for k, v in cmd_dict.items() if v is not None})
+            cmd.last_action = action
+            cmd.used_alias = used_alias
             return func_switch[action](cmd)
+        elif action in action_switch.values():
+            return func_switch[action](cmd_dict)
 
     def _add_command(self, cmd: RegisteredCommand):
         '''Adds a custom command to memory and the database.'''
-        channel_id = cmd.channel_id
-        action = cmd.last_action
         name = cmd.name
+        action = cmd.last_action
+        channel_id = cmd.channel_id
         commands = self._registry[channel_id].commands
-        used_shortcut = cmd.used_shortcut
-        error_preface = f"Failed to register command {cmd.name!r}: "
+        used_alias = cmd.used_alias
+        error_preface = f"Failed to register command {cmd.name!r}"
         err = ""
 
         if name in commands:
             err = f"""
-            Command already exists.
-            To change its message or properties, use
-            {('!cmd edit', '!editcmd')[used_shortcut]!r}.
-            """
+                {error_preface}:
+                This command already exists. To change its message or
+                properties, use {('!cmd edit', '!editcmd')[used_alias]!r}."""
             # Use '!cmd add -h' for details.
             # You can rename it with '!editcmd <oldname> --rename <newname>'.
             # To delete it completely, use '!delcmd'."""
         elif name in self.built_ins:
             err = f"""
-            Command name conflicts with a built-in command with the same name.
-            Use '--override_builtin' if you want to replace it with your custom
-            command. If you change your mind later,
-            simply delete the custom command."""
+                {error_preface}:
+                Command name conflicts with a built-in command with the same
+                name. Use '--override_builtin' if you want to replace it with
+                your custom command. If you change your mind later, simply
+                delete the custom command."""
         elif cmd.message is None:
             err = """
-            A message is required when adding a new command.
-            Messages come after any arguments."""
+                {error_preface}:
+                A message is required when adding a new command.
+                Messages must come after any arguments."""
         if err:
-            raise RegistrationError(error_preface + dedent(err))
+            raise RegistrationError(err)
 
         self._registry[channel_id].commands[name] = cmd
-        fields = ','.join(fields(cmd))
-        vals = ','.join(['?'] * len(fields(cmd)))
-        _sql = f"insert into command({fields}) values ({vals})"
+        # fields = dc.fields(cmd))
+        # cols = ','.join(fields)
+        # vals = ','.join(['?'] * len(fields))
+        # plchd = (':' + v for v in dc.asdict(cmd).values())
+        cols, vals = zip(*dc.asdict(cmd).items())
+        plchd = ','.join(':' + str(c) for c in cols)
+        # print("cols = ", cols)
+        # print("plcd = ", plchd)
+        print("vals = ", vals)
+        _sql = f"insert into command ({','.join(cols)}) values ({plchd})"
+        print(_sql)
         try:
             with self._db_conn:
-                self._db.execute(_sql, astuple(cmd))
+                self._db.execute(_sql, vals)
         except sqlite3.Error as exc:
-            err = f"DatabaseError: "
-            raise DatabaseError(error_preface + err + exc.args[0])
+            err = f"{error_preface}: DatabaseError: {exc.args[0]}"
+            raise DatabaseError(err)
         print("Added:", cmd)
         return f"Successfully added command {name!r}."
 
-    def _edit_command(self, cmd: RegisteredCommand):
+    def _edit_command(self, cmd: dict):
         '''Alters a custom command's properties in memory and the database.'''
-        channel_id = cmd.channel_id
-        action = cmd.last_action
-        name = cmd.name
-        new_name = cmd.new_name
-        used_shortcut = cmd.used_shortcut
+        channel_id = cmd['channel_id']
         commands = self._registry[channel_id].commands
-        error_preface = f"Falied to update command {name!r}: "
+        name = cmd.get('name')
+        new_name = cmd.get('new_name')
+        action = cmd.get('action')
+        used_alias = cmd.get('used_alias')
+        unstored = 'new_name', 'action', 'used_alias'
+        # del cmd['action'], cmd['used_alias']
+        error_preface = f"Falied to update command {name!r}"
         err = ""
 
         if name not in commands and name is not None:
-            err = "This command does not exist. Use '!addcmd' to add it."
+            raise CommandNotFoundError("""
+                {error_preface}: This command does not exist.
+                Use '!addcmd' to add it.""")
         elif new_name in commands:
-            err = f"""
-            Naming conflict: The name {new_name!r} matches another command with
-            the same name. Please find a different new name for {name!r}."""
+            raise NameConflict(f"""
+                {error_preface}: Naming conflict: The name {new_name!r}
+                matches another command with the same name.
+                Please find a different new name for {name!r}.""")
         elif new_name in self.built_ins and not override_builtin:
-            err = f"""
-            Naming conflict: The name {new_name!r} matches a built-in command
-            with the same name. Use '--override_builtin' if you want to replace
-            it with your custom command. If you change your mind later, simply
-            delete the custom command."""
-        if err:
-            raise RegistrationError(error_preface + dedent(err))
+            raise NameConflict(f"""
+                {error_preface}: Naming conflict: The name {new_name!r}
+                matches a built-in command with the same name.
+                Use '--override_builtin' if you want to replace it
+                with your custom command. If you change your mind later,
+                simply delete the custom command.""")
         
-        store_as = name or new_name
-        old_command = commands[name]._replace(**cmd)
-        if new_name:
-            store_as = cmd['name'] = new_name
-            del cmd['new_name']
-            del self._registry[channel_id].commands[name]
-        else:
-            store_as = name
+        cmd['name'] = new_name or name
+        for attr, val in cmd.items():
+            if val not in unstored and val is not None:
+                setattr(self._registry[channel_id].commands[name], attr, val)
 
-        self._registry[channel_id].commands[name] = command
-
-        columns = ','.join(command._fields)
-        placehds = ','.join(['?'] * len(command._fields))
+        keys, vals = zip(*dc.asdict(cmd).items())
+        cols = ','.join(keys)
+        params = ','.join(['?'] * len(command._fields))
         cond = f"(channel_id, name) = ({channel_id}, {name!r})"
-        _sql = f"update command set({columns}) = ({placehds}) where {cond}"
+        _sql = f"update command set({cols}) = ({params}) where {cond}"
 
         try:
             with self._db_conn:
-                self._db.execute(_sql, command)
+                self._db.execute(_sql, vals)
         except sqlite3.Error as exc:
-            err = f"DatabaseError: {exc.args[0]}"
-            raise DatabaseError(error_preface + dedent(err))
-        except Exception as exc:
-            err = "An unexpected error occurred while attempting this operation: "
-            return err + exc.args[0]
+            err = f"{error_preface}: Database error: {exc.args[0]}"
+            raise DatabaseError(err)
+        # except Exception as exc:
+            # err = """
+                # An unexpected error occurred while attempting this operation: 
+                # {exc.args[0]}"""
+            # raise err
         print("Edited:", command)
         return f"Successfully updated command {name!r}."
 
 
     def _toggle_command(self, cmd: dict):
         '''Disable or enable a command by updating
-        the database and in-memory dataclasses.'''
+        the database and in-memory dc.'''
         channel_id = cmd['channel_id']
         commands = self._registry[channel_id].commands
-        names = cmd.get('commands')
+        names = set(cmd.get('commands'))
         count = len(names)
         plur = "s" if count > 1 else ""
+        error_preface = f"Failed to {action} command{plur}"
 
         action = cmd.get('action')
         actions = ('disable', 'enable')
         if action not in actions:
-            err = f"Failed to perform operation: Invalid action: {action!r}"
-            raise parse_cmd.InvalidAction(err)
-        error_preface = f"Failed to {action} command{plur}: "
+            err = f"""
+                Failed to perform the requested operation:
+                Invalid action: {action!r}"""
+            raise InvalidAction(err)
 
-        toggles = []
+        attr = 'is_enabled'
+        toggle = action == 'enable'
         for name in names:
-            if name in commands:
-                toggle = actions.index(action)
-                old_command = commands[name]
-                command = old_command._replace(is_enabled=toggle)
-                self._registry[channel_id].commands[name] = command
-                toggles.append(toggle)
-            else:
-                err = f"Command {name!r} does not exist."
-                raise LookupError(error_preface + err)
+            if name not in self._registry[channel_id].commands:
+                err = f"{error_preface}: Command {name!r} does not exist."
+                raise CommandNotFoundError(err)
+            self._registry[channel_id].commands[name].is_enabled = toggle
 
-            pairs = [(channel_id, n) for n in names]
-            cond = "(channel_id, name) = (?, ?)"
-            _sql = f"update command set (is_enabled) = {toggle} where {cond}"
-            try:
-                with self._db_conn:
-                    self._db.executemany(_sql, pairs)
-            except sqlite3.Error as exc:
-                err = "Database error: "
-                raise DatabaseError(error_preface + err + exc.args[0])
+        cond = f"(channel_id, name) = ({channel_id}, ?)"
+        _sql = f"update command set is_enabled = ? where {cond}"
+        try:
+            with self._db_conn:
+                self._db.executemany(_sql, zip(toggles, names))
+        except sqlite3.Error as exc:
+            err = f"{error_preface}: Database error: exc.args[0]"
+            raise DatabaseError(err)
+
         desc = f"{count} command{plur}" if plur else f"command {names[0]!r}"
         resp = f"Successfully {action}d {desc}."
         return resp
 
 
     def _delete_command(self, cmd):
-        '''Delete a command, update the database and in-memory dataclasses.'''
-        print(cmd)
+        '''Delete a command, update the database and in-memory dataclass.'''
         channel_id = cmd['channel_id']
         names = set(cmd.get('commands'))
         count = len(names)
         plur = "s" if count > 1 else ""
-        error_preface = f"Failed to delete {len(names)} command{plur}: "
-        err = ''
+        error_preface = f"Failed to delete {len(names)} command{plur}"
+        err = ""
 
         for name in names:
             if name in self._registry[channel_id].commands:
                 del self._registry[channel_id].commands[name]
             elif name in self.built_ins:
                 err = f"""
-                Command {name!r} is a built-in command. It cannot be deleted,
-                but you may disable it with '!disable {name}'."""
+                    {error_preface}: Command {name!r} is a built-in command.
+                    It cannot be deleted, but you may disable
+                    it with '!disable {name}'."""
+                raise NameConflict(err)
             else:
-                err = f"Command {name!r} does not exist."
-            if err:
-                raise LookupError(error_preface + dedent(err))
+                err = f"{error_preface}: Command {name!r} does not exist."
+                raise CommandNotFoundError(err)
 
-        pairs = [(channel_id, n) for n in names]
-        _sql = "delete from command where (channel_id, name) = (?, ?)"
+        cond = f"(channel_id, name) = ({channel_id}, ?)"
+        _sql = f"delete from command where {cond}"
+        print(_sql)
+        print(*names)
         try:
             with self._db_conn:
-                self._db.executemany(_sql, pairs)
+                self._db.executemany(_sql, *names)
         except sqlite3.Error as exc:
-            err = f"Database error: {exc.args[0]}"
-            raise DatabaseError(error_preface + err)
+            err = f"{error_preface}: Database error: {exc.args[0]}"
+            raise DatabaseError(err)
         except Exception as exc:
             err = "An unexpected error occurred while attempting this operation: "
             return error_preface + err + exc.args[0]

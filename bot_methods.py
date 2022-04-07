@@ -1,4 +1,5 @@
-from twitchio.ext.commands import Context
+from twitchio.ext import commands
+# from twitchio.ext.commands import Context
 
 async def event_ready(self):
     '''Have the bot do things upon connection to the Twitch server.'''
@@ -26,7 +27,7 @@ async def event_message(self, message):
 
     await self.handle_commands(message)
 
-async def global_before_invoke(self, ctx: Context):
+async def global_before_invoke(self, ctx: commands.Context):
     '''Sets some useful values as Context attributes.'''
     # TwitchIO splits and re-joins message content internally.
     # To preserve message whitespace, regex the raw data from Twitch:
