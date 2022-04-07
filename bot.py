@@ -9,7 +9,7 @@ import atexit
 from dotenv import load_dotenv
 from textwrap import dedent
 from errors import *
-import base_classes_dict_for_default
+from base_classes_dict_for_default import Yeetrbot
 from my_commands import string_commands
 import bot_methods
 # from my_commands.string_commands import derp, uwu, uhm
@@ -18,7 +18,7 @@ import bot_methods
 
 # Load and assign environment variables
 env_file = ".bot.env"
-db_file = "db/botdb.db"
+db_file = "db/bot.db"
 load_dotenv(env_file)
 env_keys = ('ACCESS_TOKEN', 'CLIENT_ID', 'BOT_NICK', 'BOT_PREFIX', 'INITIAL_CHANNELS')
 ENV: dict = {k: v for k, v in os.environ.items() if k in env_keys}
@@ -29,7 +29,7 @@ ENV['INITIAL_CHANNELS'] = ENV['INITIAL_CHANNELS'].split(',')
 channel_data_fields = ['channel', 'commands', 'death_count']
 channel_data_file = 'db/channel_data.csv'
 
-class ChatBot(commands.Bot, base_classes.Yeetrbot):
+class ChatBot(commands.Bot, Yeetrbot):
     '''Base class for bot configs containing default commands and variables.'''
     def __init__(self):
         self._init_database(db_file)
@@ -43,7 +43,7 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         # self.register_command(4567, 'testcomm2', "My newer command.",)
         self.display_name = ENV['BOT_NICK']
         # print(self.channel_data)
-        print(self.regd_channels)
+        print(self._registry)
         # print(self.channels)
         # print(self.com)
 
@@ -106,7 +106,7 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         except (ChannelNotFoundError, CommandNotFoundError) as exc:
             resp = dedent(exc.args[0])
             print("Lookup error:", resp)
-        except base_classes.DatabaseError as exc:
+        except DatabaseError as exc:
             resp = dedent(exc.args[0])
             print("Database error:", resp)
         except (InvalidArgument, InvalidSyntax, InvalidAction) as exc:
@@ -159,7 +159,7 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         # print(bot_usr)
         # print(channel_usr.id)
         # print(my_usr.id)
-        # print(self.regd_channels)
+        # print(self._registry)
         # await ctx.send("I'm awake!")
     
         pass

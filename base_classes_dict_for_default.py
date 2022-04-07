@@ -27,17 +27,17 @@ class RegisteredCommand:
     channel_id: int
     name: str
     message: str = dc.field(repr=False)
-    aliases: list[str] = []
-    perms: str = 'everyone'
-    count: int = 0
-    is_hidden: bool = dc.field(default=False)
-    is_enabled: bool = dc.field(default=True)
     author_id: int = dc.field(repr=False)
     author_name: str = dc.field(repr=False)
     modified_by: str = dc.field(repr=False)
     # Times in seconds since epoch; use time.gmtime() to convert to UTC
     ctime: int = dc.field(repr=False)
     mtime: int = dc.field(repr=False)
+    aliases: list[str] = dc.field(default_factory=list)
+    perms: str = 'everyone'
+    count: int = 0
+    is_hidden: bool = dc.field(default=False)
+    is_enabled: bool = dc.field(default=True)
     override_builtin: bool = dc.field(default=None, repr=False)
 
 
@@ -46,7 +46,7 @@ class RegisteredChannel:
     channel_id: int
     username: str
     display_name: str
-    commands: dict = {}
+    commands: dict = dc.field(default_factory=dict)
 
 
 class Yeetrbot:
@@ -93,10 +93,13 @@ class Yeetrbot:
     def _init_commands(self):
         '''Retrieves command records from the database and
         initializes a `RegisteredCommand` object for each.'''
-        fields = ','.join(_command_field_names)
+        fields = ','.join([f.name for f in dc.fields(RegisteredCommand)])
+        print(fields)
+        # fields = ','.join(dc.fields(RegisteredCommand))
         # cond = "where override_builtin = None"
         cond = ""
         _sql = f"select {fields} from command {cond}"
+        print(_sql)
         records = self._db.execute(_sql)
         for record in records:
             cmd = RegisteredCommand(*record)

@@ -1,3 +1,5 @@
+from twitchio.ext.commands import Context
+
 async def event_ready(self):
     '''Have the bot do things upon connection to the Twitch server.'''
     print(f"{self.display_name} is online!")
