@@ -10,6 +10,7 @@ import atexit
 from dotenv import load_dotenv
 from textwrap import dedent
 from errors import *
+import base_classes
 from base_classes import Yeetrbot
 from my_commands import string_commands
 import bot_methods
@@ -30,7 +31,7 @@ ENV['INITIAL_CHANNELS'] = ENV['INITIAL_CHANNELS'].split(',')
 channel_data_fields = ['channel', 'commands', 'death_count']
 channel_data_file = 'db/channel_data.csv'
 
-class ChatBot(commands.Bot, Yeetrbot):
+class ChatBot(commands.Bot, base_classes.Yeetrbot):
     '''Base class for bot configs containing default commands and variables.'''
     def __init__(self):
         self._init_database(db_file)
@@ -61,9 +62,9 @@ class ChatBot(commands.Bot, Yeetrbot):
             )
         # self.channels = ENV['INITIAL_CHANNELS']
 
-        #self.global_before_invoke = bot_methods.global_before_invoke
-        #self.event_message = bot_methods.event_message
-        #self.event_ready = bot_methods.event_ready
+        self.global_before_invoke = self._global_before_invoke
+        self.event_message = self._event_message
+        self.event_ready = self._event_ready
 
     async def event_ready(self):
         '''Have the bot do things upon connection to the Twitch server.'''
