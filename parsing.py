@@ -54,10 +54,10 @@ cmd_edit.add_argument('--rename', '-r', nargs=1, dest='new_name')
 other_actions = subparsers.add_parser('!cmd', add_help=False)
 other_actions.add_argument('commands', nargs='+')
 
-cmd_delete = subparsers.add_parser('delete', parents=[other_actions], exit_on_error=False, description="Delete commands.", help="Multiple commands may be deleted at once.")
-cmd_disable = subparsers.add_parser('disable', parents=[other_actions], exit_on_error=False, description="Disable commands.", help="Multiple commands may be disabled at once.")
-cmd_enable = subparsers.add_parser('enable', parents=[other_actions], exit_on_error=False, description="Enable commands.", help="Multiple commands may be enabled at once.")
-cmd_alias = subparsers.add_parser('alias', parents=[other_actions], exit_on_error=False, description="Set command aliases.", help="Specify one or more aliases for a given command.")
+#cmd_delete = subparsers.add_parser('delete', parents=[other_actions], exit_on_error=False, description="Delete commands.", help="Multiple commands may be deleted at once.")
+#cmd_disable = subparsers.add_parser('disable', parents=[other_actions], exit_on_error=False, description="Disable commands.", help="Multiple commands may be disabled at once.")
+#cmd_enable = subparsers.add_parser('enable', parents=[other_actions], exit_on_error=False, description="Enable commands.", help="Multiple commands may be enabled at once.")
+#cmd_alias = subparsers.add_parser('alias', parents=[other_actions], exit_on_error=False, description="Set command aliases.", help="Specify one or more aliases for a given command.")
 
 
 def parse_cmd(msg: str, parser: ArgumentParser = parser) -> tuple|Namespace:
@@ -106,7 +106,7 @@ def parse_cmd(msg: str, parser: ArgumentParser = parser) -> tuple|Namespace:
             #if args[i] not in valid_flags:
             #i == len(args) - 1
             if i == len(args) - 1 or args[i] not in valid_flags:
-                raise InvalidArgument(f"Syntax error: {exc}")
+                raise InvalidArgument(f"Syntax error: {exc.capitalize()}")
             num_parsed += 1
 
     if not last_result:
