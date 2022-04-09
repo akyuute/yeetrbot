@@ -41,6 +41,12 @@ class ParserError(Exception):
     '''Base exception for parsing errors'''
     pass
 
+class ParsingIncomplete(ParserError):
+    '''Raised when the current iteration of `parse_args()`
+    encounters an error, such as before the command name is
+    parsed or at the beginning of the message.'''
+    pass
+
 class InvalidArgument(ParserError):
     '''Error raised when a parsed argument is counted as invalid.'''
     pass

@@ -69,11 +69,10 @@ create table if not exists command (
     , is_enabled integer not null
     , is_hidden integer not null
     , author_id integer not null
-    , author_name text not null
     , modified_by integer
-    , override_builtin integer -- not null
-    , ctime text -- not null
-    , mtime text -- not null
+    -- , override_builtin integer -- not null
+    , ctime integer not null
+    , mtime integer -- not null
     , foreign key(channel_id) references channel(id)
 );
 

@@ -26,20 +26,19 @@ class RegisteredCommand:
     name: str
     message: str = dc.field(repr=False)
     author_id: int = dc.field(repr=False)
-    author_name: str = dc.field(repr=False)
     # Times in seconds since epoch; use time.gmtime() to convert to UTC
     ctime: int = dc.field(default=round(time.time()), repr=False)
-    mtime: int = dc.field(default=None, repr=False)
+    mtime: int = dc.field(default=round(time.time()), repr=False)
     modified_by: str = dc.field(default=None, repr=False)
-    aliases: list[str] = dc.field(default_factory=list)
+    aliases: list[str] = None
+    # aliases: list[str] = dc.field(default_factory=list)
     perms: str = 'everyone'
     count: int = 0
     is_hidden: bool = dc.field(default=False)
     is_enabled: bool = dc.field(default=True)
-    override_builtin: bool = dc.field(default=None, repr=False)
+    # override_builtin: bool = dc.field(default=None, repr=False)
 
-
-@dc.dataclass  # (slots=True)
+@dc.dataclass(slots=True)
 class RegisteredChannel:
     channel_id: int
     username: str
@@ -223,12 +222,7 @@ class Yeetrbot:
         action = ''
         msg = ctx.msg
         body = ctx.msg.split(None, 1)
-        # if len(body) != 2:
-            # try:
-                # return parsing(body[0])
-            # except Exception as exc:
-                # print("Parser exception...", exc)
-                # print(type(exc), exc.args[0])
+
         if prefixless == base_name:
             action, msg = body
             syntax = "<cmd syntax>"
@@ -237,6 +231,9 @@ class Yeetrbot:
                 raise InvalidAction(err)
         elif prefixless in action_switch:
             action = action_switch[prefixless]
+
+        if action in ('delete', 'disable', 'enable', 'alias'):
+            return func_switch[action](channel_id, msg)
 
         parsed = parse_cmd(msg=f"{action} {msg}")
         # print("Parsed:", parsed)
@@ -267,18 +264,22 @@ class Yeetrbot:
         cmd_dict['message'] = message
         cmd_dict['aliases'] = aliases[0] if aliases else None
         cmd_dict['author_id'] = ctx.author_id
-        cmd_dict['author_name'] = ctx.author.name
         # cmd_dict['used_alias'] = used_alias
 
         if action == 'add':
+            if not message:
+                err = "A message is required when adding a new command."
+                raise RegistrationError(err)
             print(f"{cmd_dict=}")
             cmd = RegisteredCommand(**{k: v for k, v in cmd_dict.items() if v is not None})
             cmd.last_action = action
             cmd.used_alias = used_alias
             print("cmd=", dc.asdict(cmd))
             return func_switch[action](cmd)
-        elif action in action_switch.values():
+        elif action == 'edit':
             return func_switch[action](cmd_dict)
+        else:
+            raise InvalidSyntax(f"Invalid syntax: {action!r}")
 
     def _add_command(self, cmd: RegisteredCommand):
         '''Adds a custom command to memory and the database.'''
@@ -358,13 +359,13 @@ class Yeetrbot:
                 {error_preface}: Naming conflict: The name {new_name!r}
                 matches another command with the same name.
                 Please find a different new name for {name!r}.""")
-        elif new_name in self.built_ins and not override_builtin:
-            raise NameConflict(f"""
-                {error_preface}: Naming conflict: The name {new_name!r}
-                matches a built-in command with the same name.
-                Use '--override_builtin' if you want to replace it
-                with your custom command. If you change your mind later,
-                simply delete the custom command.""")
+        # elif new_name in self.built_ins and not override_builtin:
+            # raise NameConflict(f"""
+                # {error_preface}: Naming conflict: The name {new_name!r}
+                # matches a built-in command with the same name.
+                # Use '--override_builtin' if you want to replace it
+                # with your custom command. If you change your mind later,
+                # simply delete the custom command.""")
 
         cmd_dict['name'] = new_name or name
         for key, val in tuple(cmd_dict.items()):
@@ -500,13 +501,13 @@ class Yeetrbot:
         return resp
 
 
-    def _delete_command(self, cmd):
-        '''Delete a command, update the database and in-memory dataclass.'''
-        channel_id = cmd['channel_id']
-        names = set(cmd.get('commands'))
+    def _delete_command(self, channel_id, msg):
+        '''Delete a command, updating the database and in-memory dataclass.'''
+        print("msg:", msg)
+        names = set(msg.split())
         count = len(names)
         plur = "s" if count > 1 else ""
-        error_preface = f"Failed to delete {len(names)} command{plur}"
+        error_preface = f"Failed to delete {count} command{plur}: "
         err = ""
 
         for name in names:
@@ -514,27 +515,27 @@ class Yeetrbot:
                 del self._registry[channel_id].commands[name]
             elif name in self.built_ins:
                 err = f"""
-                    {error_preface}: Command {name!r} is a built-in command.
+                    {error_preface}Command {name!r} is a built-in command.
                     It cannot be deleted, but you may disable
                     it with '!disable {name}'."""
                 raise NameConflict(err)
             else:
-                err = f"{error_preface}: Command {name!r} does not exist."
+                err = f"{error_preface}Command {name!r} does not exist."
                 raise CommandNotFoundError(err)
 
         cond = f"(channel_id, name) = ({channel_id}, ?)"
         _sql = f"delete from command where {cond}"
-        print(_sql)
-        print(*names)
+        # print(_sql)
+        # print(names)
         try:
             with self._db_conn:
-                self._db.executemany(_sql, *names)
+                self._db.executemany(_sql, ((n,) for n in names))
         except sqlite3.Error as exc:
-            err = f"{error_preface}: Database error: {exc.args[0]}"
+            err = f"{error_preface}Database error: {exc.args[0]}"
             raise DatabaseError(err)
         except Exception as exc:
             err = "An unexpected error occurred while attempting this operation: "
-            return error_preface + err + exc.args[0]
+            return error_preface + err + exc.args[0].capitalize()
         desc = f"{count} command{plur}" if plur else f"command {names.pop()!r}"
         resp = f"Successfully deleted {desc}."
         return resp

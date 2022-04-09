@@ -6,6 +6,7 @@ from errors import *
 
 
 def interpret_bool(value: str):
+    '''Returns `True` or `False` for truthy or falsy strings.'''
     truthy = "true t yes y on 1".split()
     falsy = "false f no n off 0".split()
     pattern = value.lower()
@@ -15,7 +16,17 @@ def interpret_bool(value: str):
     return match
 
 
-parser = ArgumentParser(prog='!cmd', description='CMD DESC', exit_on_error=False)
+class QuietParser(ArgumentParser):
+    '''`ArgumentParser` that doesn't spam stderr with usage messages.'''
+    # def __init__(self, **kwargs):
+        # super().__init__(self, **kwargs)
+    pass
+
+    def error(self, message):
+        raise ParsingIncomplete(message)
+
+
+parser = QuietParser(prog='!cmd', description='CMD DESC', exit_on_error=False)
 subparsers = parser.add_subparsers(help="Help for all subcommands here.")
 
 cmd_add_or_edit = subparsers.add_parser('!cmd', add_help=False)
@@ -27,7 +38,7 @@ cmd_add_or_edit.add_argument('--aliases', '-a', nargs=1)
 cmd_add_or_edit.add_argument('--count', '-c', type=int)
 cmd_add_or_edit.add_argument('--disable', '-d', action='store_false', dest='is_enabled')
 cmd_add_or_edit.add_argument('--hidden', '-i', action='store_true', dest='is_hidden')
-cmd_add_or_edit.add_argument('--override_builtin', action='store_true')
+# cmd_add_or_edit.add_argument('--override_builtin', action='store_true')
 
 cmd_add = subparsers.add_parser('add', parents=[cmd_add_or_edit], exit_on_error=False, description="Add a new custom command.", help="ADD HELP")
 
@@ -48,7 +59,7 @@ other_actions.add_argument('commands', nargs='+')
 #cmd_alias = subparsers.add_parser('alias', parents=[other_actions], exit_on_error=False, description="Set command aliases.", help="Specify one or more aliases for a given command.")
 
 
-def parse_cmd(msg: str, parser: ArgumentParser = parser) -> tuple|Namespace:
+def parse_cmd(msg: str, parser: QuietParser = parser) -> tuple|Namespace:
     '''Parses a !cmd argument string, returns new data and message.'''
     args = msg.split()
     if len(args) < 2:
@@ -73,7 +84,7 @@ def parse_cmd(msg: str, parser: ArgumentParser = parser) -> tuple|Namespace:
                 return parser.parse_args(args)
             last_result = parser.parse_args(args[:i+1])
             num_parsed += 1
-        except SystemExit as exc:
+        except ParsingIncomplete as exc:
             # Catch the help flag:
             if args[i] in ('--help', '-h'):
                 return parser.print_help()
