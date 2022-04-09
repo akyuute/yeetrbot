@@ -141,15 +141,18 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
             # await ctx.send(f"{ctx.author.mention}: ")
         try:
             resp = self._manage_custom_command(ctx)
+
+        except ChannelNotFoundError as exc:
+            resp = dedent(exc.args[0])
+            print("Lookup error:")
+            # Ignore message: This channel is not registered
+            return
         except RegistrationError as exc:
             resp = dedent(exc.args[0])
             print("Registration error:")
-        except (ChannelNotFoundError, CommandNotFoundError) as exc:
+        except CommandNotFoundError as exc:
             resp = dedent(exc.args[0])
             print("Lookup error:")
-            print(dedent(resp))
-            # Ignore message: This channel is not registered
-            return
         except DatabaseError as exc:
             resp = dedent(exc.args[0])
             print("Database error:")
@@ -165,9 +168,9 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
             # print("Unexpected error:", resp)
         # else:
             # print("Response:", dedent(resp))
-        print(dedent(resp))
+        # print(dedent(resp))
         print("Response:", dedent(resp))
-        await ctx.send(f"{ctx.author.mention} {resp}")
+        await ctx.send(f"{ctx.author.mention}: {resp}")
         #await ctx.send(f"{ctx.author.mention}: {dedent(resp)}")
 
     @commands.command(name="testmsg")
