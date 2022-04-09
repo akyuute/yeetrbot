@@ -1,5 +1,3 @@
-from parsing import InvalidArgument, InvalidSyntax, InvalidAction
-
 class BotError(Exception):
     '''Base exception for custom bot errors.'''
     pass
@@ -39,3 +37,19 @@ class NameConflict(AssignmentError):
     pass
 
 
+class ParserError(Exception):
+    '''Base exception for parsing errors'''
+    pass
+
+class InvalidArgument(ParserError):
+    '''Error raised when a parsed argument is counted as invalid.'''
+    pass
+
+class InvalidSyntax(ParserError):
+    '''Error raised when the syntax of a series of arguments is invalid.'''
+    pass
+
+class InvalidAction(ParserError):
+    '''Error raised when the first argument of a
+    command string does not match a valid action.'''
+    pass

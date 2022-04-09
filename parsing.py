@@ -2,20 +2,8 @@
 
 from configparser import ConfigParser
 from argparse import ArgumentParser, Namespace, ArgumentError
+from errors import *
 
-
-class InvalidArgument(Exception):
-    '''Error raised when a parsed argument is counted as invalid.'''
-    pass
-
-class InvalidSyntax(Exception):
-    '''Error raised when the syntax of a series of arguments is invalid.'''
-    pass
-
-class InvalidAction(Exception):
-    '''Error raised when the first argument of a
-    command string does not match a valid action.'''
-    pass
 
 def interpret_bool(value: str):
     truthy = "true t yes y on 1".split()
