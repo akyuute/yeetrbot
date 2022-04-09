@@ -105,7 +105,7 @@ def parse_cmd(msg: str, parser: QuietParser = parser) -> tuple|Namespace:
             #if args[i] not in valid_flags:
             #i == len(args) - 1
             if i == len(args) - 1 or args[i] not in valid_flags:
-                raise InvalidArgument(f"Syntax error: {exc.capitalize()}")
+                raise InvalidArgument(f"Syntax error: {str(exc).capitalize()}")
             num_parsed += 1
 
     if not last_result:
