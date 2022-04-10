@@ -33,6 +33,7 @@ cmd_add_or_edit = subparsers.add_parser('!cmd', add_help=False)
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 <<<<<<< HEAD:parse_cmd.py
 # defaults = dict.fromkeys((
     # 'perms',
@@ -65,6 +66,8 @@ cmd_add_or_edit = subparsers.add_parser('!cmd', add_help=False)
 >>>>>>> exper-dataclasses
 =======
 >>>>>>> exper-dataclasses
+=======
+>>>>>>> exper-dataclasses
 cmd_add_or_edit.add_argument('name', nargs=1)
 cmd_add_or_edit.add_argument('--perms', '-p',
     choices="everyone vip moderator owner rank=".split(),
@@ -73,6 +76,7 @@ cmd_add_or_edit.add_argument('--aliases', '-a', nargs=1)
 cmd_add_or_edit.add_argument('--count', '-c', type=int)
 cmd_add_or_edit.add_argument('--disable', '-d', action='store_false', dest='is_enabled')
 cmd_add_or_edit.add_argument('--hidden', '-i', action='store_true', dest='is_hidden')
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -101,12 +105,17 @@ cmd_add.set_defaults(**cmd_add_defaults)
 >>>>>>> exper-dataclasses
 =======
 >>>>>>> exper-dataclasses
+=======
+>>>>>>> exper-dataclasses
 # cmd_add_or_edit.add_argument('--override_builtin', action='store_true')
 
 cmd_add = subparsers.add_parser('add', parents=[cmd_add_or_edit], exit_on_error=False, description="Add a new custom command.", help="ADD HELP")
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> exper-dataclasses
+=======
 >>>>>>> exper-dataclasses
 =======
 >>>>>>> exper-dataclasses
@@ -116,6 +125,7 @@ cmd_edit = subparsers.add_parser('edit', parents=[cmd_add_or_edit],
     exit_on_error=False,
     description="Edit a custom command's message and properties.",
     help="EDIT HELP")
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -129,11 +139,14 @@ cmd_edit = subparsers.add_parser('edit', parents=[cmd_add_or_edit],
 >>>>>>> exper-dataclasses
 =======
 >>>>>>> exper-dataclasses
+=======
+>>>>>>> exper-dataclasses
 cmd_edit.add_argument('--enable', '-e', action='store_true', dest='is_enabled')
 cmd_edit.add_argument('--unhidden', '-u', action='store_false', dest='is_hidden')
 cmd_edit.add_argument('--rename', '-r', nargs=1, dest='new_name')
 
 other_actions = subparsers.add_parser('!cmd', add_help=False)
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -165,6 +178,10 @@ other_actions.add_argument('commands', nargs='+')
 other_actions.add_argument('commands', nargs='+')
 
 >>>>>>> exper-dataclasses
+=======
+other_actions.add_argument('commands', nargs='+')
+
+>>>>>>> exper-dataclasses
 #cmd_delete = subparsers.add_parser('delete', parents=[other_actions], exit_on_error=False, description="Delete commands.", help="Multiple commands may be deleted at once.")
 #cmd_disable = subparsers.add_parser('disable', parents=[other_actions], exit_on_error=False, description="Disable commands.", help="Multiple commands may be disabled at once.")
 #cmd_enable = subparsers.add_parser('enable', parents=[other_actions], exit_on_error=False, description="Enable commands.", help="Multiple commands may be enabled at once.")
@@ -172,7 +189,10 @@ other_actions.add_argument('commands', nargs='+')
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> exper-dataclasses:parsing.py
+=======
+>>>>>>> exper-dataclasses
 =======
 >>>>>>> exper-dataclasses
 =======
@@ -239,7 +259,10 @@ def parse_cmd(msg: str, parser: QuietParser = parser) -> tuple|Namespace:
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     # print(last_result)
+=======
+>>>>>>> exper-dataclasses
 =======
 >>>>>>> exper-dataclasses
 =======
