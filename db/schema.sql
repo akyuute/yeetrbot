@@ -66,14 +66,13 @@ create table if not exists command (
     , aliases text
     , perms text not null
     , count integer
-    , is_hidden integer not null
-    , override_builtin integer -- not null
     , is_enabled integer not null
+    , is_hidden integer not null
     , author_id integer not null
     , modified_by integer
-    , modified_on text
-    , ctime text -- not null
-    , mtime text -- not null
+    -- , override_builtin integer -- not null
+    , ctime integer not null
+    , mtime integer -- not null
     , foreign key(channel_id) references channel(id)
 );
 

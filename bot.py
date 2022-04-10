@@ -3,21 +3,24 @@
 from twitchio.ext import commands
 # from twitchio import channel, chatter, FollowEvent, ChannelInfo, Clip, User
 import random
+import re
 import os
 import csv
 import atexit
 from dotenv import load_dotenv
 from textwrap import dedent
-from parse_cmd import InvalidAction, InvalidArgument, InvalidSyntax
+from errors import *
 import base_classes
+from base_classes import Yeetrbot
 from my_commands import string_commands
+import bot_methods
 # from my_commands.string_commands import derp, uwu, uhm
 #from alpha.eng_funcs import EngFuncs as eng
 #eng = EngFuncs()
 
 # Load and assign environment variables
 env_file = ".bot.env"
-db_file = "db/botdb.db"
+db_file = "db/bot.db"
 load_dotenv(env_file)
 env_keys = ('ACCESS_TOKEN', 'CLIENT_ID', 'BOT_NICK', 'BOT_PREFIX', 'INITIAL_CHANNELS')
 ENV: dict = {k: v for k, v in os.environ.items() if k in env_keys}
@@ -42,15 +45,9 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         # self.register_command(4567, 'testcomm2', "My newer command.",)
         self.display_name = ENV['BOT_NICK']
         # print(self.channel_data)
-        print(self.regd_channels)
+        print(self._registry)
         # print(self.channels)
         # print(self.com)
-
-        self.global_before_invoke = self._global_before_invoke
-        self.event_message = self._event_message
-        self.event_ready = self._event_ready
-
-
 
         # Yeetrbot.__init__(self)
         # commands.Bot.__init__(self,
@@ -64,6 +61,50 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
             # initial_channels=self.channels
             )
         # self.channels = ENV['INITIAL_CHANNELS']
+
+        self.global_before_invoke = self._global_before_invoke
+        self.event_message = self._event_message
+        self.event_ready = self._event_ready
+
+    async def event_ready(self):
+        '''Have the bot do things upon connection to the Twitch server.'''
+        print(f"{self.display_name} is online!")
+        # Post a message in each registered channel's chat upon connection:
+        # for channel in self.connected_channels:
+        # notify = f"{self.display_name} is online!"
+        #     await self.get_channel(channel).send(msg)
+        #     pass
+
+    # Maybe add this and other event handlers to a cog in bot.py:
+    async def event_message(self, message):
+        # Messages sent by the bot have `echo` = True.
+        # Ignore bot messages:
+        if message.echo:
+            return
+
+        msg: str = message.content
+        # msg: str = re.split(r'PRIVMSG\s\#\w+\s:', message.raw_data, 1)[1]
+        # Do imdad():
+        if msg[:6].lower().startswith(("i'm ", "i am ", "im ")):
+            if random.random() < 0.2:
+                await message.channel.send(string_commands.imdad(msg))
+        # Channel triggers and keywords can eventually be handled here as well.
+
+        await self.handle_commands(message)
+
+    async def global_before_invoke(self, ctx: commands.Context):
+        '''Sets some useful values as Context attributes.'''
+        # TwitchIO splits and re-joins message content internally.
+        # To preserve message whitespace, regex the raw data from Twitch:
+        raw = re.split(r'PRIVMSG\s\#\w+\s:', ctx.message.raw_data, 1)[1]
+        ctx.cmd, _, ctx.msg = raw.partition(' ')
+        ctx.author_id = int(ctx.author.id)
+        channel = await ctx.channel.user()
+        ctx.chan_as_user = channel
+        # ctx.channel_copy = self._registry.get(channel.id)
+        print("--> ", channel.display_name, ctx.cmd, ctx.msg)
+
+
 
 
     # @property
@@ -82,8 +123,11 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
     async def command_join(self, ctx: commands.Context):
         if ctx.chan_as_user.id != self.user_id:
             return
-        resp, username = self._join_channel(ctx)
-        await self.join_channels([username])
+        try:
+            resp = self._join_channel(ctx)
+        except RegistrationError as exc:
+            resp = exc.args[0]
+        await self.join_channels([ctx.author.name])
         await ctx.send(f"{ctx.author.mention}: {resp}")
 
     @commands.command(name='cmd', aliases=('addcmd', 'editcmd', 'delcmd', 'disable', 'enable'))
@@ -97,26 +141,34 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
             # await ctx.send(f"{ctx.author.mention}: ")
         try:
             resp = self._manage_custom_command(ctx)
-        except base_classes.RegistrationError as exc:
-            resp = exc.args[0]
-            print("Registration error:", resp)
-        except LookupError as exc:
-            resp = exc.args[0]
-            print("Lookup error", resp)
-        except base_classes.DatabaseError as exc:
-            resp = exc.args[0]
-            print("Database error", resp)
+
+        except ChannelNotFoundError as exc:
+            resp = dedent(exc.args[0])
+            print("Lookup error:")
+            # Ignore message: This channel is not registered
+            return
+        except RegistrationError as exc:
+            resp = dedent(exc.args[0])
+            print("Registration error:")
+        except CommandNotFoundError as exc:
+            resp = dedent(exc.args[0])
+            print("Lookup error:")
+        except DatabaseError as exc:
+            resp = dedent(exc.args[0])
+            print("Database error:")
         except (InvalidArgument, InvalidSyntax, InvalidAction) as exc:
-            resp = exc.args[0]
-            print("Parsing error:", resp)
-        except TypeError as exc:
-            resp = exc.args[0]
-            print("Type error:", resp)
+            resp = dedent(exc.args[0])
+            print("Parsing error:")
+        except NotImplementedError as exc:
+            resp = dedent(exc.args[0])
+            print("Type error:")
         except Exception as exc:
-            resp = "Unexpected error: " + exc.args[0]
-            print("Unexpected error:", resp)
+            resp = "Unexpected error: " + dedent(exc.args[0])
+            raise
+            # print("Unexpected error:", resp)
         # else:
             # print("Response:", dedent(resp))
+        # print(dedent(resp))
         print("Response:", dedent(resp))
         await ctx.send(f"{ctx.author.mention}: {resp}")
         #await ctx.send(f"{ctx.author.mention}: {dedent(resp)}")
@@ -156,7 +208,7 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         # print(bot_usr)
         # print(channel_usr.id)
         # print(my_usr.id)
-        # print(self.regd_channels)
+        # print(self._registry)
         # await ctx.send("I'm awake!")
     
         pass
