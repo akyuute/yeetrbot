@@ -1,3 +1,6 @@
+from argparse import ArgumentError
+
+
 class BotError(Exception):
     '''Base exception for custom bot errors.'''
     pass
