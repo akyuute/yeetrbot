@@ -2,7 +2,7 @@
 
 from configparser import ConfigParser
 from argparse import ArgumentParser, Namespace, ArgumentError
-from errors import *
+from errors import ParsingIncomplete, InvalidArgument, InvalidSyntax
 
 
 def interpret_bool(value: str):
@@ -17,10 +17,9 @@ def interpret_bool(value: str):
 
 
 class QuietParser(ArgumentParser):
-    '''`ArgumentParser` that doesn't spam stderr with usage messages.'''
+    '''An `ArgumentParser` that doesn't spam stderr with usage messages.'''
     # def __init__(self, **kwargs):
         # super().__init__(self, **kwargs)
-    pass
 
     def error(self, message):
         raise ParsingIncomplete(message)
@@ -53,29 +52,25 @@ cmd_edit.add_argument('--rename', '-r', nargs=1, dest='new_name')
 other_actions = subparsers.add_parser('!cmd', add_help=False)
 other_actions.add_argument('commands', nargs='+')
 
-#cmd_delete = subparsers.add_parser('delete', parents=[other_actions], exit_on_error=False, description="Delete commands.", help="Multiple commands may be deleted at once.")
-#cmd_disable = subparsers.add_parser('disable', parents=[other_actions], exit_on_error=False, description="Disable commands.", help="Multiple commands may be disabled at once.")
-#cmd_enable = subparsers.add_parser('enable', parents=[other_actions], exit_on_error=False, description="Enable commands.", help="Multiple commands may be enabled at once.")
-#cmd_alias = subparsers.add_parser('alias', parents=[other_actions], exit_on_error=False, description="Set command aliases.", help="Specify one or more aliases for a given command.")
-
 
 def parse_cmd(msg: str, parser: QuietParser = parser) -> tuple|Namespace:
-    '''Parses a !cmd argument string, returns new data and message.'''
+    '''Parses a !cmd argument string, returning new data and message.'''
     args = msg.split()
-    if len(args) < 2:
+    # error_preface = f"Failed to {args[0]} command {args[1]!r}."
+
+    if len(args) < 3:
         if '-h' in args or '--help' in args:
             return parser.print_help()
-        raise InvalidSyntax("Syntax Error: Not enough arguments. <!cmd syntax info>")
-    if args[0] in ('delete', 'enable', 'disable'):
-        result = parser.parse_args(args)
-        # print(f"{result=}")
-        return result
+        err = "Syntax error: Not enough arguments. <!cmd syntax info>"
+        cmd = args[1] if len(args) == 2 else ""
+        raise InvalidSyntax(err, cmd)
 
     num_parsed = 1
     last_result: Namespace = None
-    valid_flags = ('--help', '-h', '--permissions', '-p', '--aliases', '-a', '--count', '-c', '--hidden', '-i', '--disable', '-d',  )
+    valid_flags = ('--help', '-h', '--permissions', '-p', '--aliases', '-a',
+                   '--count', '-c', '--hidden', '-i', '--disable', '-d')
     if args[0] == 'edit':
-        valid_flags += ('--rename', '-r', '--enable', '-e', '--unhidden', '-u', )
+        valid_flags += ('--rename', '-r', '--enable', '-e', '--unhidden', '-u')
 
     for i, _ in enumerate(args):
         try:
@@ -97,7 +92,8 @@ def parse_cmd(msg: str, parser: QuietParser = parser) -> tuple|Namespace:
                 break
             # If not a legitimate command name, catch this as an invalid arg:
             if i > 2:
-                raise InvalidArgument(f"Invalid argument: {args[i]!r}")
+                err = "Invalid argument: "
+                raise InvalidArgument(err + repr(args[i]), args[1])
 
         except ArgumentError as exc:
             # If the command lacks a message, begins with anything that can be interpreted
@@ -105,7 +101,8 @@ def parse_cmd(msg: str, parser: QuietParser = parser) -> tuple|Namespace:
             #if args[i] not in valid_flags:
             #i == len(args) - 1
             if i == len(args) - 1 or args[i] not in valid_flags:
-                raise InvalidArgument(f"Syntax error: {str(exc).capitalize()}")
+                err = "Syntax error: "
+                raise InvalidSyntax(err + str(exc).capitalize(), args[1])
             num_parsed += 1
 
     if not last_result:

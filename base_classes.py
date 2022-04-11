@@ -1,14 +1,10 @@
 from twitchio.ext.commands import Context
 import re
-# import os
 import time
 import random
 import sqlite3
-# import atexit
 from textwrap import dedent
-#from collections import namedtuple
 import dataclasses as dc
-#from dataclasses import dataclass, dc.astuple, dc.asdict
 
 import my_commands.built_ins as built_in_commands
 # import my_commands.default_commands as default_commands
@@ -16,6 +12,16 @@ from my_commands import string_commands
 from parsing import parse_cmd
 from errors import *
 from typing import Callable, Sequence
+
+
+@dc.dataclass(slots=True)
+class RegisteredChannel:
+    '''Class for base channel objects instantiated
+    from the database and modified as needed.'''
+    channel_id: int
+    username: str
+    display_name: str
+    commands: dict = dc.field(default_factory=dict)
 
 
 @dc.dataclass # (slots=True)
@@ -29,19 +35,11 @@ class RegisteredCommand:
     mtime: int = dc.field(default=round(time.time()), repr=False)
     modified_by: str = dc.field(default=None, repr=False)
     aliases: list[str] = None
-    # aliases: list[str] = dc.field(default_factory=list)
     perms: str = 'everyone'
     count: int = 0
     is_hidden: bool = dc.field(default=False)
     is_enabled: bool = dc.field(default=True)
     # override_builtin: bool = dc.field(default=None, repr=False)
-
-@dc.dataclass(slots=True)
-class RegisteredChannel:
-    channel_id: int
-    username: str
-    display_name: str
-    commands: dict = dc.field(default_factory=dict)
 
 
 class Yeetrbot:
@@ -224,7 +222,14 @@ class Yeetrbot:
         if action in ('delete', 'disable', 'enable', 'alias'):
             return func_switch[action](channel_id, action, msg)
 
-        parsed = parse_cmd(msg=f"{action} {msg}")
+        #parsed = parse_cmd(msg=f"{action} {msg}")
+        try:
+            parsed = parse_cmd(msg=f"{action} {msg}")
+        except (InvalidSyntax, InvalidArgument) as exc:
+            err, command = exc.args
+            error_preface = f"Failed to {action} {command!r}. " if cmd else ""
+            exc.args = (f"{error_preface}{err}",)
+            raise exc
 
         if isinstance(parsed, tuple):
             cmd_dict = vars(parsed[0])

@@ -156,7 +156,14 @@ class ChatBot(commands.Bot, base_classes.Yeetrbot):
         except DatabaseError as exc:
             resp = dedent(exc.args[0])
             print("Database error:")
-        except (InvalidArgument, InvalidSyntax, InvalidAction) as exc:
+        except InvalidSyntax as exc:
+            # resp = f"Syntax error: {str(exc).capitalize()}"
+            resp = exc.args[0]
+            print("Parsing error:")
+        except InvalidArgument as exc:
+            resp = exc.args[0]
+            print("Parsing error:")
+        except InvalidAction as exc:
             resp = dedent(exc.args[0])
             print("Parsing error:")
         except NotImplementedError as exc:
