@@ -186,6 +186,8 @@ class Yeetrbot:
         '''Parses a `!cmd` string and executes `_add_command()`,
         `_edit_command()` or `_delete_command()` based on the implied action.
         '''
+        action_errors = lambda act, cmd: ("Failed to perform requested action",
+            f"Failed to {act} command {cmd!r}")[bool(cmd)]
         channel_id = ctx.chan_as_user.id
         if channel_id not in self._registry:
             err = f"Channel with id {channel_id} is not registered."
@@ -226,9 +228,9 @@ class Yeetrbot:
         try:
             parsed = parse_cmd(msg=f"{action} {msg}")
         except (InvalidSyntax, InvalidArgument) as exc:
-            err, command = exc.args
-            error_preface = f"Failed to {action} {command!r}. " if cmd else ""
-            exc.args = (f"{error_preface}{err}",)
+            err, cmd = exc.args
+            error_preface = action_errors(action, cmd)
+            exc.args = (f"{error_preface}. {err}",)
             raise exc
 
         if isinstance(parsed, tuple):
@@ -236,10 +238,10 @@ class Yeetrbot:
             message = parsed[1]
         elif parsed is None:
             err = """
-                Failed to perform requested operation:
+                Failed to perform requested operation.
                 Parser returned NoneType, most likely resulting
                 from a --help flag. Those will be implemented soon!"""
-            raise NotImplementedError(err)
+            raise NotImplementedError(dedent(err))
         else:
             cmd_dict = vars(parsed)
             message = None
@@ -261,7 +263,7 @@ class Yeetrbot:
         cmd_dict['used_alias'] = used_alias
 
         if action in ('add', 'edit'):
-            print(f"{cmd_dict=}")
+            # print(f"{cmd_dict=}")
             return func_switch[action](cmd_dict)
         else:
             raise InvalidSyntax(f"Invalid syntax: {action!r}")
@@ -273,12 +275,12 @@ class Yeetrbot:
         action = cmd_dict.pop('action')
         used_alias = cmd_dict.pop('used_alias')
 
-        error_preface = f"Failed to register command {cmd_dict['name']!r}"
+        error_preface = f"Failed to add command {cmd_dict['name']!r}"
         err = ""
 
         if name in self._registry[channel_id].commands:
             err = f"""
-                {error_preface}:
+                {error_preface}.
                 This command already exists. To change its message or
                 properties, use {('!cmd edit', '!editcmd')[used_alias]!r}."""
             # Use '!cmd add -h' for details.
@@ -286,18 +288,18 @@ class Yeetrbot:
             # To delete it completely, use '!delcmd'."""
         elif name in self.built_ins:
             err = f"""
-                {error_preface}:
+                {error_preface}.
                 Command name conflicts with a built-in command with the same
                 name. Use '--override_builtin' if you want to replace it with
                 your custom command. If you change your mind later, simply
                 delete the custom command."""
         elif cmd_dict['message'] is None:
             err = f"""
-                {error_preface}:
+                {error_preface}.
                 A message is required when adding a new command.
                 Messages must come after any arguments."""
         if err:
-            raise RegistrationError(err)
+            raise RegistrationError(dedent(err))
 
         attrs = {k: v for k, v in cmd_dict.items() if v is not None}
         cmd = RegisteredCommand(**attrs)
@@ -311,7 +313,7 @@ class Yeetrbot:
             with self._db_conn:
                 self._db.execute(_sql, vals)
         except sqlite3.Error as exc:
-            err = f"{error_preface}: DatabaseError: {exc.args[0]}"
+            err = f"{error_preface}. DatabaseError: {exc.args[0]}"
             raise DatabaseError(err)
         print("Added:", cmd)
         return f"Successfully added command {name}"
@@ -329,21 +331,24 @@ class Yeetrbot:
         err = ""
 
         if name not in commands and name is not None:
-            raise CommandNotFoundError("""
-                {error_preface}: This command does not exist.
-                Use '!addcmd' to add it.""")
+            err = f"""
+                {error_preface}. This command does not exist.
+                Use '!addcmd' to add it."""
+            raise CommandNotFoundError(dedent(err))
         elif new_name in commands:
-            raise NameConflict(f"""
-                {error_preface}: Naming conflict: The name {new_name!r}
+            err = f"""
+                {error_preface}. Naming conflict: The name {new_name!r}
                 matches another command with the same name.
-                Please find a different new name for {name!r}.""")
+                Please find a different new name for {name!r}."""
+            raise NameConflict(dedent(err))
         # elif new_name in self.built_ins and not override_builtin:
-            # raise NameConflict(f"""
-                # {error_preface}: Naming conflict: The name {new_name!r}
+            # err = f"""
+                # {error_preface}. Naming conflict: The name {new_name!r}
                 # matches a built-in command with the same name.
                 # Use '--override_builtin' if you want to replace it
                 # with your custom command. If you change your mind later,
-                # simply delete the custom command.""")
+                # simply delete the custom command."""
+            # raise NameConflict(dedent(err))
 
         cmd_dict['name'] = new_name or name
         for key, val in tuple(cmd_dict.items()):
@@ -365,13 +370,8 @@ class Yeetrbot:
                 # self._db.execute(_sql, dc.astuple(cmd))
                 self._db.execute(_sql, tuple(cmd_dict.values()))
         except sqlite3.Error as exc:
-            err = f"{error_preface}: Database error: {exc.args[0]}"
+            err = f"{error_preface}. Database error: {exc.args[0]}"
             raise DatabaseError(err)
-        # except Exception as exc:
-            # err = """
-                # An unexpected error occurred while attempting this operation: 
-                # {exc.args[0]}"""
-            # raise err
         print("Edited:", self._registry[channel_id].commands[name])
         return f"Successfully updated command {name}"
 
@@ -381,21 +381,21 @@ class Yeetrbot:
         names = set(msg.split())
         count = len(names)
         plur = "s" if count > 1 else ""
-        error_preface = f"Failed to {action} {count} command{plur}: "
+        error_preface = f"Failed to {action} {count} command{plur}"
         err = ""
 
         actions = ('disable', 'enable')
         if action not in actions:
             err = f"""
-                Failed to perform the requested operation:
+                Failed to perform requested operation.
                 Invalid action: {action!r}"""
-            raise InvalidAction(err)
+            raise InvalidAction(dedent(err))
 
         attr = 'is_enabled'
         toggle = action == 'enable'
         for name in names:
             if name not in self._registry[channel_id].commands:
-                err = f"{error_preface}: Command {name!r} does not exist."
+                err = f"{error_preface}. Command {name!r} does not exist."
                 raise CommandNotFoundError(err)
             self._registry[channel_id].commands[name].is_enabled = toggle
 
@@ -405,7 +405,7 @@ class Yeetrbot:
             with self._db_conn:
                 self._db.executemany(_sql, zip([toggle] * count, names))
         except sqlite3.Error as exc:
-            err = f"{error_preface}: Database error: {exc.args[0]}"
+            err = f"{error_preface}. Database error: {exc.args[0]}"
             raise DatabaseError(err)
 
         desc = f"{count} command{plur}" if plur else f"command {names.pop()}"
@@ -425,12 +425,12 @@ class Yeetrbot:
                 del self._registry[channel_id].commands[name]
             elif name in self.built_ins:
                 err = f"""
-                    {error_preface}: Command {name!r} is a built-in command.
+                    {error_preface}. Command {name!r} is a built-in command.
                     It cannot be deleted, but you may disable
                     it with '!disable {name}'."""
-                raise NameConflict(err)
+                raise NameConflict(dedent(err))
             else:
-                err = f"{error_preface}: Command {name!r} does not exist."
+                err = f"{error_preface}. Command {name!r} does not exist."
                 raise CommandNotFoundError(err)
 
         cond = f"(channel_id, name) = ({channel_id}, ?)"
@@ -439,11 +439,8 @@ class Yeetrbot:
             with self._db_conn:
                 self._db.executemany(_sql, zip(names))
         except sqlite3.Error as exc:
-            err = f"{error_preface}: Database error: {exc.args[0]}"
+            err = f"{error_preface}. Database error: {exc.args[0]}"
             raise DatabaseError(err)
-        # except Exception as exc:
-            # err = "An unexpected error occurred while attempting this operation: "
-            # return error_preface + err + exc.args[0].capitalize()
         desc = f"{count} command{plur}" if plur else f"command {names.pop()}"
         resp = f"Successfully deleted {desc}"
         return resp
