@@ -61,8 +61,8 @@ def parse_cmd(msg: str, parser: QuietParser = parser) -> tuple|Namespace:
     if len(args) < 3:
         if '-h' in args or '--help' in args:
             return parser.print_help()
-        err = "Syntax error: Not enough arguments. <!cmd syntax info>"
-        cmd = args[1] if len(args) == 2 else ""
+        err = "Syntax error: Not enough arguments."
+        cmd = args[1] if len(args) >= 2 else ""
         raise InvalidSyntax(err, cmd)
 
     num_parsed = 1
