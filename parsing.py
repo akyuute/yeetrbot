@@ -1,9 +1,7 @@
 '''Functions for parsing config files, values and command strings.'''
 
-from configparser import ConfigParser
 from argparse import ArgumentParser, Namespace, ArgumentError
 from errors import ParsingIncomplete, InvalidArgument, InvalidSyntax
-
 
 def interpret_bool(value: str):
     '''Returns `True` or `False` for truthy or falsy strings.'''

@@ -7,22 +7,19 @@ import re
 import os
 import csv
 import atexit
+from configparser import ConfigParser
 from dotenv import load_dotenv
+
 from errors import *
 from base_classes import Yeetrbot
 from my_commands import string_commands
 # from my_commands.string_commands import derp, uwu, uhm
-#from alpha.eng_funcs import EngFuncs as eng
-#eng = EngFuncs()
 
-# Load and assign environment variables
-env_file = ".bot.env"
-db_file = "db/bot.db"
-load_dotenv(env_file)
-env_keys = ('ACCESS_TOKEN', 'CLIENT_ID', 'BOT_NICK', 'BOT_PREFIX', 'INITIAL_CHANNELS')
-ENV: dict = {k: v for k, v in os.environ.items() if k in env_keys}
-ENV['BOT_PREFIX'] = ENV['BOT_PREFIX'].split(',')
-ENV['INITIAL_CHANNELS'] = ENV['INITIAL_CHANNELS'].split(',')
+
+config_file = "bot_config.ini"
+config = ConfigParser(empty_lines_in_values=False)
+with open(config_file, 'r') as f:
+    config.read_file(f)
 
 
 channel_data_fields = ['channel', 'commands', 'death_count']
@@ -31,22 +28,21 @@ channel_data_file = 'db/channel_data.csv'
 class ChatBot(commands.Bot, Yeetrbot):
     '''Base class for bot configs containing default commands and variables.'''
     def __init__(self):
-        self._init_database(db_file)
+        self._init_database(config['DATABASE']['db_file'])
         self._init_channels()
         self._init_commands()
-        self.display_name = ENV['BOT_NICK']
+        self.display_name = config['CREDENTIALS']['bot_nick']
         print(self._registry)
 
+        initial_channels = config['CREDENTIALS']['initial_channels'].split(',')
+        prefixes = config['CREDENTIALS']['command_prefix']
         super().__init__(
-            token=ENV['ACCESS_TOKEN'],
-            client_secret=ENV['CLIENT_ID'],
-            nick=ENV['BOT_NICK'],
-            prefix=ENV['BOT_PREFIX'],
-            # prefix=('!','?',';'),
-            initial_channels=ENV['INITIAL_CHANNELS'] # + self.channels
-            # initial_channels=self.channels
+            token=config['CREDENTIALS']['access_token'],
+            client_secret=config['CREDENTIALS']['client_id'],
+            nick=config['CREDENTIALS']['bot_nick'],
+            prefix=[p.strip() for p in prefixes],
+            initial_channels=[c.strip() for c in initial_channels] # + self.channels
             )
-        # self.channels = ENV['INITIAL_CHANNELS']
 
         self.global_before_invoke = self._global_before_invoke
         self.event_message = self._event_message
