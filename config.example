@@ -1,7 +1,7 @@
 [CREDENTIALS]
 
 # The OAuth token and client ID for your bot's Twitch account.
-# You can obtain them from https://twitchapps.com/tmi/
+# They can be obtained from https://twitchapps.com/tmi/
 access_token=
 client_id=
 
@@ -12,14 +12,14 @@ bot_nick=
 # channels registered in the database.
 initial_channels=
 
-# Comma- and/or space-separated list of prefixes the bot will use for commands.
-command_prefix=!
-
 # Seconds to wait before responding to a duplicate command (ignore spam).
 # Note: Code for handling the command is still run and counts are incremented.
 heartbeat=30
 
 [COMMANDS]
+
+# Comma- and/or space-separated list of prefixes the bot will use for commands.
+command_prefixes=!
 
 # Unprefixed name of the built-in command used for managing other commands.
 # This is identical to "commands" with Nightbot.
@@ -48,5 +48,4 @@ require_message=true
 
 # File to which the database connects.
 db_file=db/bot.db
-
 

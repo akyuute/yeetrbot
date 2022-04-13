@@ -16,7 +16,7 @@ from my_commands import string_commands
 # from my_commands.string_commands import derp, uwu, uhm
 
 
-config_file = "bot_config.ini"
+config_file = "bot.conf"
 config = ConfigParser(empty_lines_in_values=False)
 with open(config_file, 'r') as f:
     config.read_file(f)
