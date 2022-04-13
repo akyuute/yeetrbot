@@ -1,17 +1,45 @@
 from twitchio.ext.commands import Context
 import re
+import sys
 import time
 import random
 import sqlite3
-from textwrap import dedent
+import itertools
 import dataclasses as dc
+from textwrap import dedent
+from argparse import ArgumentParser
+from configparser import ConfigParser
 
 import my_commands.built_ins as built_in_commands
 # import my_commands.default_commands as default_commands
 from my_commands import string_commands
-from parsing import parse_cmd
+from parsing import parse_cmd, fuzzy_split
 from errors import *
 from typing import Callable, Sequence
+
+
+class Config(ConfigParser):
+    def __init__(self, file):
+        cli_parser = ArgumentParser()
+        cli_parser.add_argument('--config')
+
+        super().__init__(empty_lines_in_values=False)
+        config_file = cli_parser.parse_args(sys.argv[1:]).config or file
+        with open(config_file, 'r') as f:
+            self.read_file(f)
+        self.file = file
+
+        nested_attrs = (self.items(sec) for sec in self)
+        pairs = itertools.chain.from_iterable(nested_attrs)
+        for attr, val in pairs:
+            setattr(self, attr, val)
+
+        remove_commas = lambda s: (w.strip() for w in s.split(','))
+        prefix_str = self['COMMANDS']['command_prefixes']
+        prefixes = tuple(remove_commas(prefix_str))
+        self.prefixes = prefixes
+        initial_channels_str = self['CREDENTIALS']['initial_channels']
+        self.initial_channels = tuple(remove_commas(initial_channels_str))
 
 
 @dc.dataclass(slots=True)
@@ -44,13 +72,11 @@ class RegisteredCommand:
 
 class Yeetrbot:
     '''Contains methods for database exchanges and additional functionality.'''
-    db_file = "db/bot.db"
-
     def __init__(self):
-        self._init_database(__class__.db_file)
-        self._init_channels()
-        self._init_commands()
-        # self._init_built_ins()
+
+        # self.base_command = tuple(remove_commas(config.base_command_name))
+        # self.base_aliases = tuple(fuzzy_split(config.base_command_aliases))
+        pass
 
     async def _event_ready(self):
         '''Have the bot do things upon connection to the Twitch server.'''
@@ -119,14 +145,12 @@ class Yeetrbot:
     @property
     def channels(self):
         '''A list of registered channel names.'''
-        # names += ENV['INITIAL_CHANNELS']
         return [c.username for c in self._registry.values()]
 
     def _init_commands(self):
         '''Retrieves command records from the database and
         initializes a `RegisteredCommand` object for each.'''
         fields = ','.join([f.name for f in dc.fields(RegisteredCommand)])
-        # fields = ','.join(dc.fields(RegisteredCommand))
         # cond = "where override_builtin = None"
         cond = ""
         _sql = f"select {fields} from command {cond}"
@@ -135,8 +159,9 @@ class Yeetrbot:
             cmd = RegisteredCommand(*record)
             self._registry[cmd.channel_id].commands[cmd.name] = cmd
  
-    # def get_commands(self, channel_id: int):
-        # return [c.name for c in self._registry[channel_id].commands]
+    def get_commands(self, channel_id: int) -> list:
+        # return [c for c in self._registry[channel_id].commands]
+        return list(self._registry[channel_id].commands.keys())
 
     def _register_channel(self, uid: int, name: str, display_name: str):
         '''Registers a channel to the database if new, otherwise raises
@@ -146,7 +171,6 @@ class Yeetrbot:
             err = f"Channel {name!r} is already registered."
             raise RegistrationError(err)
         channel = RegisteredChannel(uid, name, display_name)
-        # channel.commands = {}
         self._registry[uid] = channel
         fields = ('id', 'name', 'display_name')
         values = (uid, name, display_name)
@@ -181,11 +205,20 @@ class Yeetrbot:
             resp = "I am already in your channel!"
         return resp
 
-    def _manage_custom_command(self, ctx: Context, base_name: str = 'cmd',
-            alias_names="addcmd editcmd delcmd disable enable alias".split()):
+    def _manage_custom_command(self, ctx: Context, base_name: str = None,
+            alias_names: str = None):
+        # "addcmd, editcmd, delcmd, disable, enable, alias".split()):
+            # config.base_command_aliases.split()):
         '''Parses a `!cmd` string and executes `_add_command()`,
-        `_edit_command()` or `_delete_command()` based on the implied action.
-        '''
+        `_edit_command()` or `_delete_command()` based
+        on the implied action.'''
+
+        if base_name is None:
+            base_name = self.base_command_name
+            # alias_names = fuzzy_split(self.base_command_aliases)
+        if alias_names is None:
+            alias_names = self.base_aliases
+
         action_errors = lambda act, cmd: ("Failed to perform requested action",
             f"Failed to {act} command {cmd!r}")[bool(cmd)]
         channel_id = ctx.chan_as_user.id
@@ -194,7 +227,8 @@ class Yeetrbot:
             raise ChannelNotFoundError(err)
 
         # alias_names="addcmd editcmd delcmd disable enable alias".split()
-        actions = "add edit delete disable enable alias".split()
+        # actions = "add edit delete disable enable alias".split()
+        actions = self.cmd_actions
         action_switch = dict(zip(alias_names, actions))
 
         func_switch = {
@@ -212,9 +246,10 @@ class Yeetrbot:
         msg = ctx.msg
         body = ctx.msg.split(None, 1)
 
-        if prefixless == base_name:
-            action, msg = body
+        if prefixless == base_name and len(body) >= 2:
+            (action, msg) = body if len(body) > 1 else ("", body[0])
             syntax = "<cmd syntax>"
+            print(action)
             if action not in func_switch:
                 err = f"Invalid action: {action!r}. Syntax: {syntax}"
                 raise InvalidAction(err)
@@ -275,6 +310,13 @@ class Yeetrbot:
         action = cmd_dict.pop('action')
         used_alias = cmd_dict.pop('used_alias')
 
+        actions = self.cmd_actions
+        base_name = self.base_command_name
+        base_aliases = self.base_aliases
+        full_names = (f"!{base_name} {a}" for a in actions)
+        aliases = ("!" + a for a in base_aliases)
+        alias_switch = dict(zip(actions, zip(full_names, aliases)))
+
         error_preface = f"Failed to add command {cmd_dict['name']!r}"
         err = ""
 
@@ -282,7 +324,8 @@ class Yeetrbot:
             err = f"""
                 {error_preface}.
                 This command already exists. To change its message or
-                properties, use {('!cmd edit', '!editcmd')[used_alias]!r}."""
+                properties, use {alias_switch[action][used_alias]!r}}."""
+                # {('!cmd edit', '!editcmd')[used_alias]!r}."""
             # Use '!cmd add -h' for details.
             # You can rename it with '!editcmd <oldname> --rename <newname>'.
             # To delete it completely, use '!delcmd'."""
