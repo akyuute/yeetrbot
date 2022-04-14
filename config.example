@@ -8,37 +8,47 @@ client_id=
 # Name by which the bot should refer to itself.
 bot_nick=
 
-# Comma- and/or space-separated list of channels to join before joining the
+# A space-separated list of channels to join before joining the
 # channels registered in the database.
 initial_channels=
 
-# Seconds to wait before responding to a duplicate command (ignore spam).
+# Seconds to wait before responding to a duplicate (spammed) command.
 # Note: Code for handling the command is still run and counts are incremented.
 heartbeat=30
 
 [COMMANDS]
 
-# Comma- and/or space-separated list of prefixes the bot will use for commands.
+# A space-separated list of command prefixes. A prefix can be one or more
+# characters. If more than one are specified, the bot will respond to commands
+# beginning with any in the list.
 command_prefixes=!
 
-# Unprefixed name of the built-in command used for managing other commands.
-# This is identical to "commands" with Nightbot.
+# The unprefixed name of the built-in command used for managing other commands.
+# This is identical to the "commands" command with Nightbot. Ensure the name
+# does not include a prefix (e.g., "!commands" -> "commands").
 base_command_name=cmd
 
-# Specify unprefixed aliases for actions of the management base command in the
-# form of a comma- or space-separated list of names in the following order:
-##### ADD EDIT DELETE DISABLE ENABLE ALIAS
-base_command_aliases=addcmd, editcmd, delcmd, disable, enable, alias
+# Assign aliases to actions of the command management built-in command. Again,
+# do not include prefixes. If you would prefer your mods use the full
+# "<!cmd> <action>" syntax instead of a certain alias, leave the option blank.
+add_command_alias=addcmd
+edit_command_alias=editcmd
+delete_command_alias=delcmd
+disable_command_alias=disable
+enable_command_alias=enable
+give_alias_command_alias=alias
+show_command_alias=showcmd
+syntax_command_alias=syntax
 
 # Allow custom commands to override built-in commands with the same names.
 # Note: Command admins are given a warning and asked to confirm the decision.
 override_builtins=true
 
-# Lowest permissions any chatter would need to use to commands.
-# Options: everyone|vip|moderator|owner
+# Lowest permissions any chatter would need to use to commands. Choose one from
+# the following: { everyone, vip, moderator, owner }
 default_perms=everyone
 
-# Initial count given to a new command.
+# The initial count given to a new command.
 default_count=0
 
 # Require a message when adding a new command.
@@ -46,6 +56,6 @@ require_message=true
 
 [DATABASE]
 
-# File to which the database connects.
+# The file to which the database connects.
 db_file=db/bot.db
 
