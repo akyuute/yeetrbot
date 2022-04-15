@@ -7,7 +7,6 @@ import re
 import os
 
 from errors import *
-from parsing import fuzzy_split
 from base_classes import Yeetrbot, Config
 from my_commands import string_commands
 # from my_commands.string_commands import derp, uwu, uhm
@@ -21,13 +20,15 @@ class ChatBot(commands.Bot, Yeetrbot):
         self._init_database(config['DATABASE']['db_file'])
         self._init_channels()
         self._init_commands()
-        self.display_name = config['CREDENTIALS']['bot_nick']
-        self.base_command_name = config.base_command_name
-        self.cmd_actions = "add edit delete disable enable alias".split()
-        # aliases = fuzzy_split(config.base_command_aliases)
-        # self.base_aliases = dict(zip(actions, aliases))
-        self.base_aliases = tuple(fuzzy_split(config.base_command_aliases))
         print(self._registry)
+
+        self.display_name = config['CREDENTIALS']['bot_nick']
+        self._base_command_name = config.base_command_name
+        self._base_command_aliases = config.base_aliases
+        self._require_message = config.require_message
+        self._default_perms = config.default_perms
+        self._default_count = config.default_count
+        self._override_builtins = config.override_builtins
 
         super().__init__(
             # token=config['CREDENTIALS']['access_token'],
@@ -35,7 +36,7 @@ class ChatBot(commands.Bot, Yeetrbot):
             # client_secret=config['CREDENTIALS']['client_id'],
             client_secret=config.client_id,
             # nick=config['CREDENTIALS']['bot_nick'],
-            nick=config.bot_nick,
+            nick=self.display_name,
             prefix=config.prefixes,
             initial_channels=config.initial_channels # + self.channels
             )
@@ -87,6 +88,9 @@ class ChatBot(commands.Bot, Yeetrbot):
         except RegistrationError as exc:
             resp = exc.args[0]
             print("Registration error:")
+        except NameConflict as exc:
+            resp = exc.args[0]
+            print("Name conflict:")
         except CommandNotFoundError as exc:
             resp = exc.args[0]
             print("Lookup error:")
