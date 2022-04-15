@@ -4,17 +4,6 @@ from argparse import ArgumentParser, Namespace, ArgumentError
 from errors import ParsingIncomplete, InvalidArgument, InvalidSyntax
 
 
-def interpret_bool(value: str):
-    '''Returns `True` or `False` for truthy or falsy strings.'''
-    truthy = "true t yes y on 1".split()
-    falsy = "false f no n off 0".split()
-    pattern = value.lower()
-    if pattern not in truthy + falsy:
-        raise ValueError(f"Invalid argument: {pattern!r}")
-    match = pattern in truthy or not pattern in falsy
-    return match
-
-
 class QuietParser(ArgumentParser):
     '''An `ArgumentParser` that doesn't spam stderr with usage messages.'''
     # def __init__(self, **kwargs):
