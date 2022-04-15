@@ -13,33 +13,9 @@ from configparser import ConfigParser
 import my_commands.built_ins as built_in_commands
 # import my_commands.default_commands as default_commands
 from my_commands import string_commands
-from parsing import parse_cmd, fuzzy_split
+from parsing import parse_cmd
 from errors import *
 from typing import Callable, Sequence
-
-
-class Config(ConfigParser):
-    def __init__(self, file):
-        cli_parser = ArgumentParser()
-        cli_parser.add_argument('--config')
-
-        super().__init__(empty_lines_in_values=False)
-        config_file = cli_parser.parse_args(sys.argv[1:]).config or file
-        with open(config_file, 'r') as f:
-            self.read_file(f)
-        self.file = file
-
-        nested_attrs = (self.items(sec) for sec in self)
-        pairs = itertools.chain.from_iterable(nested_attrs)
-        for attr, val in pairs:
-            setattr(self, attr, val)
-
-        remove_commas = lambda s: (w.strip() for w in s.split(','))
-        prefix_str = self['COMMANDS']['command_prefixes']
-        prefixes = tuple(remove_commas(prefix_str))
-        self.prefixes = prefixes
-        initial_channels_str = self['CREDENTIALS']['initial_channels']
-        self.initial_channels = tuple(remove_commas(initial_channels_str))
 
 
 @dc.dataclass(slots=True)
@@ -56,28 +32,22 @@ class RegisteredChannel:
 class RegisteredCommand:
     channel_id: int
     name: str
-    message: str = dc.field(repr=False)
-    author_id: int = dc.field(repr=False)
-    # Times in seconds since epoch; use time.gmtime() to convert to UTC
-    ctime: int = dc.field(default=round(time.time()), repr=False)
-    mtime: int = dc.field(default=round(time.time()), repr=False)
-    modified_by: str = dc.field(default=None, repr=False)
+    message: str
+    author_id: int
+    modified_by: int
     aliases: list[str] = None
     perms: str = 'everyone'
     count: int = 0
-    is_hidden: bool = dc.field(default=False)
-    is_enabled: bool = dc.field(default=True)
-    # override_builtin: bool = dc.field(default=None, repr=False)
+    # Times in seconds since epoch; use time.gmtime() to convert to UTC
+    ctime: int = round(time.time())
+    mtime: int = round(time.time())
+    is_hidden: bool = False
+    is_enabled: bool = True
+    # override_builtin: bool = None
 
 
 class Yeetrbot:
     '''Contains methods for database exchanges and additional functionality.'''
-    def __init__(self):
-
-        # self.base_command = tuple(remove_commas(config.base_command_name))
-        # self.base_aliases = tuple(fuzzy_split(config.base_command_aliases))
-        pass
-
     async def _event_ready(self):
         '''Have the bot do things upon connection to the Twitch server.'''
         print(f"{self.display_name} is online!")
@@ -142,11 +112,6 @@ class Yeetrbot:
             channel_id = record[0]
             self._registry[channel_id] = RegisteredChannel(*record)
 
-    @property
-    def channels(self):
-        '''A list of registered channel names.'''
-        return [c.username for c in self._registry.values()]
-
     def _init_commands(self):
         '''Retrieves command records from the database and
         initializes a `RegisteredCommand` object for each.'''
@@ -159,9 +124,18 @@ class Yeetrbot:
             cmd = RegisteredCommand(*record)
             self._registry[cmd.channel_id].commands[cmd.name] = cmd
  
+    # @property
+    # def channels(self):
+        # '''A list of registered channel names.'''
+        # return [c.username for c in self._registry.values()]
+
+    @property
+    def registered_channels(self) -> list:
+        registered_channels = [c.username for uid, c in self._registry.items()]
+        return registered_channels
+
     def get_commands(self, channel_id: int) -> list:
-        # return [c for c in self._registry[channel_id].commands]
-        return list(self._registry[channel_id].commands.keys())
+        return list(self._registry[channel_id].commands)
 
     def _register_channel(self, uid: int, name: str, display_name: str):
         '''Registers a channel to the database if new, otherwise raises
@@ -205,31 +179,17 @@ class Yeetrbot:
             resp = "I am already in your channel!"
         return resp
 
-    def _manage_custom_command(self, ctx: Context, base_name: str = None,
-            alias_names: str = None):
-        # "addcmd, editcmd, delcmd, disable, enable, alias".split()):
-            # config.base_command_aliases.split()):
+    def _manage_custom_command(self, ctx: Context):
         '''Parses a `!cmd` string and executes `_add_command()`,
-        `_edit_command()` or `_delete_command()` based
-        on the implied action.'''
+        `_edit_command()` or `_delete_command()` based on implied action.'''
 
-        if base_name is None:
-            base_name = self.base_command_name
-            # alias_names = fuzzy_split(self.base_command_aliases)
-        if alias_names is None:
-            alias_names = self.base_aliases
-
-        action_errors = lambda act, cmd: ("Failed to perform requested action",
-            f"Failed to {act} command {cmd!r}")[bool(cmd)]
         channel_id = ctx.chan_as_user.id
         if channel_id not in self._registry:
             err = f"Channel with id {channel_id} is not registered."
             raise ChannelNotFoundError(err)
 
-        # alias_names="addcmd editcmd delcmd disable enable alias".split()
-        # actions = "add edit delete disable enable alias".split()
-        actions = self.cmd_actions
-        action_switch = dict(zip(alias_names, actions))
+        alias_switch = self._base_command_aliases
+        actions = alias_switch.keys()
 
         func_switch = {
             'add': self._add_command,
@@ -240,43 +200,91 @@ class Yeetrbot:
             'alias': self._edit_command
         }
 
-        test_prefixes = {ctx.cmd.removeprefix(p) for p in ctx.prefix}
-        prefixless = (lambda x: x[min(x)])({len(c): c for c in test_prefixes})
+        prefixless = ctx.cmd.removeprefix(ctx.prefix)
         action = ""
         msg = ctx.msg
-        body = ctx.msg.split(None, 1)
+        if msg:
+            body = msg.split(None, 1)
+        else:
+            # Store syntax for commands in another file!
+            return f"{ctx.cmd} syntax: <command syntax>"
 
-        if prefixless == base_name and len(body) >= 2:
-            (action, msg) = body if len(body) > 1 else ("", body[0])
+        if prefixless == self._base_command_name : # and len(body) >= 2:
+            (action, msg) = body if len(body) > 1 else (body[0], "")
             syntax = "<cmd syntax>"
-            print(action)
             if action not in func_switch:
                 err = f"Invalid action: {action!r}. Syntax: {syntax}"
                 raise InvalidAction(err)
-        elif prefixless in action_switch:
-            action = action_switch[prefixless]
+        # elif prefixless in alias_switch.values():
+        else:
+            action = {v: k for k, v in alias_switch.items()}.get(prefixless)
 
         if action in ('delete', 'disable', 'enable', 'alias'):
             return func_switch[action](channel_id, action, msg)
 
-        #parsed = parse_cmd(msg=f"{action} {msg}")
+        full_base = ctx.prefix + self._base_command_name
+        used_alias = prefixless in alias_switch.values()
+        get_base_and_alias = lambda a: (
+            f"{full_base} {a}",
+            ctx.prefix + alias_switch[a])
+        base_or_alias = {a: get_base_and_alias(a) for a in ('add', 'edit')}
+
+        name = msg.split(None, 1)[0] if len(msg) > 0 else ""
+        get_action_error = (
+            f"Failed to perform requested action",
+            f"Failed to {action} command {name!r}"
+            )[bool(name)]
+        error_preface = get_action_error
+
+        update_err_dict = {
+            'add': [{
+                'test': name in self._registry[channel_id].commands,
+                'exc': NameConflict(dedent(f"""
+                    {error_preface}.
+                    This command already exists. To change its message or
+                    properties, use 
+                    {base_or_alias['edit'][used_alias]!r}."""))
+                }, {
+
+                'test': name in self.built_ins,
+                'exc': NameConflict(dedent(f"""
+                    {error_preface}.
+                    Command name conflicts with a built-in command with the
+                    same name. Use '--override_builtin' if you want to replace
+                    it with your custom command. If you change your mind
+                    later, simply delete the custom command."""))
+                },
+            ],
+
+            'edit': [{
+                'test': name not in self._registry[channel_id].commands,
+                'exc': CommandNotFoundError(dedent(f"""
+                    {error_preface}.
+                    This command does not exist.
+                    To add it, use {base_or_alias['add'][used_alias]!r}."""))
+                },
+            ]
+        }
+
+        for err in update_err_dict[action]:
+            if err['test']:
+                raise err['exc']
+
         try:
             parsed = parse_cmd(msg=f"{action} {msg}")
         except (InvalidSyntax, InvalidArgument) as exc:
-            err, cmd = exc.args
-            error_preface = action_errors(action, cmd)
+            err, name = exc.args
             exc.args = (f"{error_preface}. {err}",)
             raise exc
+        except NotImplementedError as exc:
+            err = """
+                Failed to perform requested operation.
+                This feature will be implemented soon!"""
+            raise NotImplementedError(dedent(err))
 
         if isinstance(parsed, tuple):
             cmd_dict = vars(parsed[0])
             message = parsed[1]
-        elif parsed is None:
-            err = """
-                Failed to perform requested operation.
-                Parser returned NoneType, most likely resulting
-                from a --help flag. Those will be implemented soon!"""
-            raise NotImplementedError(dedent(err))
         else:
             cmd_dict = vars(parsed)
             message = None
@@ -284,64 +292,43 @@ class Yeetrbot:
         for arg in ('name', 'new_name', 'aliases'):
             if isinstance(cmd_dict.get(arg), list):
                 cmd_dict[arg] = cmd_dict[arg][0]
-                #cmd_dict[arg] = cmd_dict[arg] if cmd_dict.get(arg) else None
 
         name = cmd_dict.get('name')
         new_name = cmd_dict.get('new_name')
         aliases = cmd_dict.get('aliases')
-        used_alias = prefixless in action_switch
 
-        cmd_dict['channel_id'] = channel_id
-        cmd_dict['message'] = message
-        cmd_dict['action'] = action
-        cmd_dict['author_id'] = ctx.author_id
-        cmd_dict['used_alias'] = used_alias
+        cmd_dict.update(
+            channel_id=channel_id,
+            message=message,
+            action=action,
+            modified_by=ctx.author_id,
+            mtime=round(time.time()),
+            base_name_or_alias=base_or_alias[action][used_alias]
+        )
 
         if action in ('add', 'edit'):
-            # print(f"{cmd_dict=}")
             return func_switch[action](cmd_dict)
         else:
             raise InvalidSyntax(f"Invalid syntax: {action!r}")
 
     def _add_command(self, cmd_dict: dict):
         '''Adds a custom command to memory and the database.'''
+        cmd_dict.setdefault('author_id', cmd_dict['modified_by'])
+        cmd_dict.setdefault('perms', self._default_perms)
+        cmd_dict.setdefault('count', self._default_count)
         channel_id = cmd_dict['channel_id']
         name = cmd_dict['name']
-        action = cmd_dict.pop('action')
-        used_alias = cmd_dict.pop('used_alias')
+        cmd_dict.pop('action')
+        base_name_or_alias = cmd_dict.pop('base_name_or_alias')
 
-        actions = self.cmd_actions
-        base_name = self.base_command_name
-        base_aliases = self.base_aliases
-        full_names = (f"!{base_name} {a}" for a in actions)
-        aliases = ("!" + a for a in base_aliases)
-        alias_switch = dict(zip(actions, zip(full_names, aliases)))
-
-        error_preface = f"Failed to add command {cmd_dict['name']!r}"
+        error_preface = f"Failed to add command {name!r}"
         err = ""
 
-        if name in self._registry[channel_id].commands:
-            err = f"""
-                {error_preface}.
-                This command already exists. To change its message or
-                properties, use {alias_switch[action][used_alias]!r}}."""
-                # {('!cmd edit', '!editcmd')[used_alias]!r}."""
-            # Use '!cmd add -h' for details.
-            # You can rename it with '!editcmd <oldname> --rename <newname>'.
-            # To delete it completely, use '!delcmd'."""
-        elif name in self.built_ins:
-            err = f"""
-                {error_preface}.
-                Command name conflicts with a built-in command with the same
-                name. Use '--override_builtin' if you want to replace it with
-                your custom command. If you change your mind later, simply
-                delete the custom command."""
-        elif cmd_dict['message'] is None:
+        if cmd_dict['message'] is None and self._require_message:
             err = f"""
                 {error_preface}.
                 A message is required when adding a new command.
                 Messages must come after any arguments."""
-        if err:
             raise RegistrationError(dedent(err))
 
         attrs = {k: v for k, v in cmd_dict.items() if v is not None}
@@ -359,48 +346,46 @@ class Yeetrbot:
             err = f"{error_preface}. DatabaseError: {exc.args[0]}"
             raise DatabaseError(err)
         print("Added:", cmd)
-        return f"Successfully added command {name}"
+        return f"Successfully added command {name}."
 
     def _edit_command(self, cmd_dict: dict):
         '''Alters a custom command's properties in memory and the database.'''
         channel_id = cmd_dict['channel_id']
         commands = self._registry[channel_id].commands
-        name = cmd_dict.get('name')
+        name = cmd_dict.pop('name')
         new_name = cmd_dict.pop('new_name', None)
-        action = cmd_dict.pop('action', None)
-        used_alias = cmd_dict.pop('used_alias', None)
-        unstored = 'new_name', 'action', 'used_alias'
+        modified_by = cmd_dict
+        base_name_or_alias = cmd_dict.pop('base_name_or_alias')
+        action = cmd_dict.pop('action')
+
         error_preface = f"Falied to update command {name!r}"
         err = ""
 
-        if name not in commands and name is not None:
-            err = f"""
-                {error_preface}. This command does not exist.
-                Use '!addcmd' to add it."""
-            raise CommandNotFoundError(dedent(err))
-        elif new_name in commands:
+        if new_name in commands:
             err = f"""
                 {error_preface}. Naming conflict: The name {new_name!r}
                 matches another command with the same name.
                 Please find a different new name for {name!r}."""
             raise NameConflict(dedent(err))
-        # elif new_name in self.built_ins and not override_builtin:
-            # err = f"""
-                # {error_preface}. Naming conflict: The name {new_name!r}
-                # matches a built-in command with the same name.
-                # Use '--override_builtin' if you want to replace it
-                # with your custom command. If you change your mind later,
-                # simply delete the custom command."""
-            # raise NameConflict(dedent(err))
+        elif new_name in self.built_ins : # and not override_builtin:
+            err = f"""
+                {error_preface}. Naming conflict: The name {new_name!r}
+                matches a built-in command with the same name.
+                Use '--override_builtin' if you want to replace it
+                with your custom command. If you change your mind later,
+                simply delete the custom command."""
+            raise NameConflict(dedent(err))
 
-        cmd_dict['name'] = new_name or name
+        # Dict changes size, hence conversion to tuple:
         for key, val in tuple(cmd_dict.items()):
-            if val not in unstored and val is not None:
+            if val is not None:
                 setattr(self._registry[channel_id].commands[name], key, val)
             else:
                 cmd_dict.pop(key)
-
-        # print("cmd_dict:", cmd_dict)
+        if new_name:
+            cmd_dict['name'] = new_name
+            new_cmd = self._registry[channel_id].commands.pop(name)
+            self._registry[channel_id].commands[new_name] = new_cmd
 
         # keys, vals = zip(*dc.asdict(cmd).items())
         cols = ','.join(cmd_dict.keys())
@@ -415,8 +400,10 @@ class Yeetrbot:
         except sqlite3.Error as exc:
             err = f"{error_preface}. Database error: {exc.args[0]}"
             raise DatabaseError(err)
-        print("Edited:", self._registry[channel_id].commands[name])
-        return f"Successfully updated command {name}"
+        print("Edited:", self._registry[channel_id].commands.get(name) or new_cmd)
+        resp = f"Successfully updated command {name}"
+        resp += f" and renamed it {new_name!r}." if new_name else "."
+        return resp
 
     def _toggle_command(self, channel_id, action: str, msg: str):
         '''Disable or enable a command by updating
@@ -452,7 +439,7 @@ class Yeetrbot:
             raise DatabaseError(err)
 
         desc = f"{count} command{plur}" if plur else f"command {names.pop()}"
-        resp = f"Successfully {action}d {desc}"
+        resp = f"Successfully {action}d {desc}."
         return resp
 
     def _delete_command(self, channel_id: int, action: str, msg: str):
@@ -485,7 +472,7 @@ class Yeetrbot:
             err = f"{error_preface}. Database error: {exc.args[0]}"
             raise DatabaseError(err)
         desc = f"{count} command{plur}" if plur else f"command {names.pop()}"
-        resp = f"Successfully deleted {desc}"
+        resp = f"Successfully deleted {desc}."
         return resp
 
     def register_variable(self, varname: str):

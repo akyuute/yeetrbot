@@ -1,60 +1,52 @@
 #bot.py
 
 from twitchio.ext import commands
-# from twitchio import channel, chatter, FollowEvent, ChannelInfo, Clip, User
 import random
 import re
 import os
 
 from errors import *
-from base_classes import Yeetrbot, Config
+from parse_config import Config
+from base_classes import Yeetrbot
 from my_commands import string_commands
 # from my_commands.string_commands import derp, uwu, uhm
 
 
-config = Config(file="bot.conf")
-
 class ChatBot(commands.Bot, Yeetrbot):
     '''Base class for bot configs containing default commands and variables.'''
-    def __init__(self):
-        self._init_database(config['DATABASE']['db_file'])
+    def __init__(self, config: Config | dict):
+        self._db_file = config['DATABASE'].get('db_file', 'db/bot.db')
+        self._init_database(self._db_file)
         self._init_channels()
         self._init_commands()
-        print(self._registry)
 
         self.display_name = config['CREDENTIALS']['bot_nick']
-        self._base_command_name = config.base_command_name
-        self._base_command_aliases = config.base_aliases
+        initial_channels = config['CREDENTIALS']['initial_channels'].split()
+        self._initial_channels = set(initial_channels + self.registered_channels)
+
+        cmd_conf = config['COMMANDS']
+        self.prefixes = cmd_conf.get('command_prefixes', "!").split()
+        self._base_command_name = cmd_conf['base_command_name']
+        self._default_perms = cmd_conf.get('default_perms', "everyone")
+        self._default_count = int(cmd_conf.get('default_count', 0))
         self._require_message = config.require_message
-        self._default_perms = config.default_perms
-        self._default_count = config.default_count
         self._override_builtins = config.override_builtins
 
+        aliases = (a for a in cmd_conf.items() if '_command_alias' in a[0])
+        alias_dict = {k.removesuffix('_command_alias'): v for k, v in aliases}
+        self._base_command_aliases = alias_dict
+
         super().__init__(
-            # token=config['CREDENTIALS']['access_token'],
-            token=config.access_token,
-            # client_secret=config['CREDENTIALS']['client_id'],
-            client_secret=config.client_id,
-            # nick=config['CREDENTIALS']['bot_nick'],
+            token=config['CREDENTIALS']['access_token'],
+            client_secret=config['CREDENTIALS']['client_id'],
             nick=self.display_name,
-            prefix=config.prefixes,
-            initial_channels=config.initial_channels # + self.channels
+            prefix=self.prefixes,
+            initial_channels=self._initial_channels
             )
 
         self.global_before_invoke = self._global_before_invoke
         self.event_message = self._event_message
         self.event_ready = self._event_ready
-
-    # @property
-    # def channels(self):
-    #     data = self.channel_data
-    #     names = []
-    #     try:
-    #         for chan in data:
-    #             names.append(next(data[chan]['name']))
-    #     finally:
-    #         return names
-
 
 
     @commands.command(name="join")
@@ -69,6 +61,7 @@ class ChatBot(commands.Bot, Yeetrbot):
         await ctx.send(f"{ctx.author.mention}: {resp}")
 
     @commands.command(name='cmd', aliases=('addcmd', 'editcmd', 'delcmd', 'disable', 'enable'))
+    #self._base_command_aliases
     async def command_cmd(self, ctx: commands.Context):
         resp = ""
         if not ctx.author.is_mod:
@@ -98,7 +91,6 @@ class ChatBot(commands.Bot, Yeetrbot):
             resp = exc.args[0]
             print("Database error:")
         except InvalidSyntax as exc:
-            # resp = f"Syntax error: {str(exc).capitalize()}"
             resp = exc.args[0]
             print("Parsing error:")
         except InvalidArgument as exc:
@@ -109,55 +101,21 @@ class ChatBot(commands.Bot, Yeetrbot):
             print("Parsing error:")
         except NotImplementedError as exc:
             resp = exc.args[0]
-            print("Type error:")
+            print("Feature not implemented:")
         except Exception as exc:
             resp = "Unexpected error: " + exc.args[0]
             raise
-            # print("Unexpected error:", resp)
-        # else:
-            # print("Response:", resp))
-        # print(resp))
         print("Response:", resp)
         await ctx.send(f"{ctx.author.mention}: {resp}")
-        #await ctx.send(f"{ctx.author.mention}: {resp)}")
 
     @commands.command(name="testmsg")
     async def command_testmsg(self, ctx: commands.Context):
-        # msg = ctx.message.content
-        # au = ctx.author
-        # print(au._fetch_channel().user())
-        # await ctx.send(str(len(au.user().fetch_followers()) )) # fetch_following())
-        # myuserobj = au.user()
         # mychatterobj = ctx.get_user(au.name)
-        # print(mychatterobj)
-        # print(chatter.Chatter.)
-
         # print(User("https://twitch.tv/"+str(mychatterobj.channel), {}))
-
-        # print(myuserobj)
-        
         # print(chatter.User.fetch_followers(()))
-        # print(chatter.User.fetch_followers(au.user()))
-        # await ctx.send(str(au.user()))
-        # print(au.id, au.mention, au.name, au.display_name, au.color)
-        # print(ctx.command.  parse_args(ctx, None, parsed={}))
-        # await ctx.send("")
-        #fetch_followers())
-        # print(isinstance(msg, str))
-        #await ctx.send(str(ctx.author.color))#{ctx.message.content}))
-        # msg = "!testmsg arg1 arg2 arg3"
-        # print(msg)))
-        # print(msg.lstrip(r"^.*\s"), msg.removeprefix(r"!.*\s"))
         # print(ctx.message.raw_data)
-        # channel_usr = await ctx.channel.user()
-        # my_usr = await ctx.author.user()
-        # bot_usr = await self.fetch_users([ENV['BOT_NICK'].lower()])
-
-        # print(bot_usr)
-        # print(channel_usr.id)
-        # print(my_usr.id)
         # print(self._registry)
-        # await ctx.send("I'm awake!")
+        await ctx.send("I'm awake!")
     
         pass
 
@@ -175,7 +133,7 @@ class EventsCog(commands.Cog):
     #     print(f"{self.bot.display_name} is online!")
     #     # Also post a message in chat upon connection
     #     for channel in self.bot.channels:
-    #         # await self.get_channel(channel).send(f"{self.display_name} is online!")
+    #         # await self.registered_channel(channel).send(f"{self.display_name} is online!")
     #         pass
 
     # commands.Cog.event()
@@ -196,16 +154,13 @@ class EventsCog(commands.Cog):
 class StrCommands(commands.Cog):
     '''Cog class for string commands.
     Run prepare_bot() to add this cog to a bot.'''
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot):
         self.bot = bot
-        # super().__init__()
-        # pass
+        pass
 
     @commands.command(name="!uwu")
     async def command_uwu(self, ctx: commands.Context):
-        # msg = ctx.message.content.lstrip(f"{BOT_PREFIX}{uwu.__name__}")
-        msg = str(ctx.message.content).partition(' ')[2]
-        # print(msg)
+        msg = ctx.msg
         resp = string_commands.uwu(msg)
         # error_occurred = len(resp) == 2
         if len(resp) == 2:
@@ -219,10 +174,9 @@ class StrCommands(commands.Cog):
         # await ctx.send(uwu(msg))
         # return uwu(query)
 
-    @commands.command(name="derp", ) # aliases=("testmsg",))
+    @commands.command(name="derp")
     async def command_derp(self, ctx: commands.Context):
-        # msg = ctx.message.content
-        msg = str(ctx.message.content).partition(' ')[2]
+        msg = ctx.msg
         resp = string_commands.derp(msg)
         if len(resp) == 2:
             error_occurred = resp[1] != 0
@@ -362,143 +316,24 @@ class MiscCommandsCog(commands.Cog):
         !deaths +/- <int>                   -> count +/-= <int>
         '''
 
-
-
-    #@commands.command()
-    #async def hello(self, ctx: commands.Context):
-        # Here we have a command hello, we can invoke our command with our prefix and command name
-        # e.g ?hello
-        # We can also give our commands aliases (different names) to invoke with.
-
-        # Send a hello back!
-        # Sending a reply back to the channel is easy... Below is an example.
-        #await ctx.send(f'Hello, {ctx.author.display_name}!')
-    
-
-
-
-    ###############async def add_command(self, command=commands.Command(name, func)):
-
-    ###############add_command(self, command=commands.Command(name='!pleasework', func=print("did this work?")))
-    #Bot.add_command(self, command)
-
-
 def prepare_bot(bot: commands.Bot, cogs: tuple[commands.Cog]):
     '''Prepare a bot object with cogs, etc.'''
     for cog in cogs:
         bot.add_cog(cog)
 
 
+if __name__ == '__main__':
+    bot_config = Config(file="bot.conf")
+    mybot = ChatBot(bot_config)
 
+    # print(bot.commands)
+    # print(tuple(mybot.get_db_channels()))
+    # print(mybot.get_db_channels)
+    # mybot.register_channel(123456, "my_user3", "My_User3")
+    # print("Registered channels:", mybot.registered_channels)
+    print("Joined channels:", mybot._initial_channels)
 
+    prepare_bot(bot=mybot, cogs=(StrCommands(mybot), EventsCog(mybot), MiscCommandsCog(mybot)))
+    mybot._db_conn.commit()
+    mybot.run()
 
-mybot = ChatBot()
-
-# print(bot.commands)
-# print(tuple(mybot.get_db_channels()))
-# print(mybot.get_db_channels)
-# mybot.query_db("INSERT into channel(user_id, name, display_name) values (12345, 'my_user2', 'My_User2')")
-# mybot.register_channel(123456, "my_user3", "My_User3")
-print("Registered channels:", mybot.channels)
-
-
-
-# @atexit.register
-# def preserve_data():
-#     with open(channel_data_file, 'w') as f:
-#         writer = csv.DictWriter(f, fieldnames=channel_data_fields)
-#         writer.writerows(channel_data)
-
-prepare_bot(bot=mybot, cogs=(StrCommands(mybot), EventsCog(mybot), MiscCommandsCog(mybot)))
-# mybot.remove_command("join")
-mybot._db_conn.commit()
-mybot.run()
-
-
-
-
-# bot.run() is blocking and will stop execution of any below code here until stopped or closed.
-
-'''
-@bot.event
-async def event_ready():
-    'Called once when the bot goes online.'
-    print(f"{os.environ['BOT_NICK']} is online!")
-    ws = bot._ws  # this is only needed to send messages within event_ready
-    await ws.send_privmsg(os.environ['CHANNEL'], f"/me is online!")
-
-@bot.event
-async def event_message(ctx):
-    'Runs every time a message is sent in chat.'
-
-    # make sure the bot ignores itself and the streamer:
-    if ctx.author.name.lower() == os.environ['BOT_NICK'].lower():
-        return
-
- 
-
-    
-    await bot.handle_commands(ctx)
-
-
-    if 'hello' in ctx.content.lower():
-        await ctx.channel.send(f"Hi, @{ctx.author.name}!")
-
-
-@bot.command(name='test')
-async def test(ctx):
-    await ctx.send('/me is online!')
-
-@bot.command(name='randword')
-async def rand_word(ctx):
-    msg = eng.rand_word()
-    await ctx.send(msg)
-
-@bot.command(name='randdef')
-async def rand_def(ctx):
-    msg = eng.rand_def()
-    await ctx.send(msg)
-
-@bot.command(name='define')
-async def define(ctx):
-    query = str(ctx.content).replace('!define','')
-    # offer_choice = f"[num_matches] definitions found for '[word]'. Please choose a definition (1-[num_matches] / ALL):\n> " 
-    msg = eng.define(query)
-    if eng.needs_input:
-        await ctx.send(eng.offer_choice)
-        # choice =  await ctx.next_input or something()
-
-    # print(str(ctx.content).replace('!define',''))
-    await ctx.send(msg)
-
-korok_list = []
-
-@bot.command(name='klist')
-async def klist(ctx):
-    global korok_list 
-    def get_missing(my_list):
-        if korok_list == []:
-            msg = "No Koroks reported missing."
-        else: return f"Missing Koroks: {', '.join(my_list)}"
-    #query = str(ctx.content).replace(',','').replace('!klist','').split(' ').remove('')
-    query = [word.replace(',','') for word in str(ctx.content).split() if word != '!klist']
-    if len(query) > 0:
-        if query[0] == 'remove':
-            korok_list.remove(query[1])
-            msg = f"Removed 1 Korok. {get_missing(korok_list)}"
-        elif query[0] == 'clear':
-            korok_list.clear()
-            msg = "Korok list cleared :D"
-        elif len(query) >= 1:
-            korok_list.extend(query)
-            msg = get_missing(korok_list)
-    else: msg = get_missing(korok_list)
-    #msg = query
-
-    await ctx.send(msg)
-
-
-if __name__ == "__main__":
-  bot.run()
-
-'''
