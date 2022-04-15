@@ -1,7 +1,13 @@
-[CREDENTIALS]
+# Copy this file to the same directory as bot.py. Name it whatever you like
+# and pass the filename with the --config flag when running bot.py, or name it
+# bot.conf to skip doing that.
 
-# The OAuth token and client ID for your bot's Twitch account.
-# They can be obtained from https://twitchapps.com/tmi/
+
+[CREDENTIALS]
+# All credentials fields are required.
+
+# The OAuth token and client ID for your bot's Twitch account. They can be
+# obtained from https://twitchapps.com/tmi/
 access_token=
 client_id=
 
