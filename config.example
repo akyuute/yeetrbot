@@ -16,6 +16,7 @@ initial_channels=
 # Note: Code for handling the command is still run and counts are incremented.
 heartbeat=30
 
+
 [COMMANDS]
 
 # A space-separated list of command prefixes. A prefix can be one or more
@@ -53,6 +54,7 @@ default_count=0
 
 # Require a message when adding a new command.
 require_message=true
+
 
 [DATABASE]
 

@@ -4,11 +4,6 @@ from argparse import ArgumentParser, Namespace, ArgumentError
 from errors import ParsingIncomplete, InvalidArgument, InvalidSyntax
 
 
-def fuzzy_split(s: str, sep: str = ','):
-    '''Returns a generator of arguments split from a
-    string separated by commas and/or whitespace.'''
-    return (w.strip() for w in s.split(sep))
-
 def interpret_bool(value: str):
     '''Returns `True` or `False` for truthy or falsy strings.'''
     truthy = "true t yes y on 1".split()
