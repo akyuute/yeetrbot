@@ -28,6 +28,4 @@ class Config(ConfigParser):
         override_builtins = self['COMMANDS'].get('override_builtins', "t")
         self.require_message = str_to_bool(require_message)
         self.override_builtins = str_to_bool(override_builtins)
-        # self['COMMANDS']['require_message'] = str_to_bool(require_message)
-        # self['COMMANDS']['override_builtins'] = str_to_bool(override_builtins)
 
