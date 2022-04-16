@@ -12,12 +12,14 @@ from twitchio.ext.commands import Context
 
 from my_commands import string_commands
 import my_commands.built_ins as built_in_commands
-from parsing import cmd_add_parser, cmd_edit_parser
+from parsing import (cmd_add_parser, cmd_edit_parser,
+    cmd_add_or_edit, valid_parser_flags)
 from errors import (
     ChannelNotFoundError,
     CommandNotFoundError,
     RegistrationError,
     NameConflict,
+    InvalidSyntax,
     ParsingError,
     DatabaseError,
     )
@@ -142,10 +144,18 @@ class Yeetrbot:
     def get_commands(self, channel_id: int) -> list:
         return list(self._registry[channel_id].commands)
 
-    def _get_syntax(self, command: str, args: list|str = None):
+    def _get_syntax(self, command: str, args="", syntaxes: dict = None):
         '''Returns the syntax/usage statement of a built-in command. Raises
         `CommandNotFoundError` if the command does not exist.'''
-        pass
+        if syntaxes is None:
+            syntax = self.syntaxes[command]
+        # if command not in self.built_ins:
+            # err = f"Built-in command {command!r} does not exist."
+            # raise CommandNotFoundError(err)
+        args = args.split() if args and isinstance(args, str) else [""]
+        if set(syntax).isdisjoint(set(args)):
+            raise ValueError("No arguments in list")
+        return ' '.join(syntax.get(m, "") for m in set(args))
 
     def _register_channel(self, uid: int, name: str, display_name: str):
         '''Registers a channel to the database if new, otherwise raises
@@ -211,44 +221,81 @@ class Yeetrbot:
         }
 
         prefixless = ctx.cmd.removeprefix(ctx.prefix)
-        action = ""
-        msg = ctx.msg
-        if msg:
-            body = msg.split(None, 1)
-        else:
-            # Store syntax for commands in another file!
-            return f"{ctx.cmd} syntax: <command syntax>"
-
-        if prefixless == self._base_command_name : # and len(body) >= 2:
-            (action, msg) = body if len(body) > 1 else (body[0], "")
-            syntax = "<cmd syntax>"
-            if action not in func_switch:
-                err = f"Invalid action: {action!r}. Syntax: {syntax}"
-                raise InvalidAction(err)
-        # elif prefixless in alias_switch.values():
-        else:
-            action = {v: k for k, v in alias_switch.items()}.get(prefixless)
-
-        if action in ('delete', 'disable', 'enable', 'alias'):
-            return func_switch[action](channel_id, action, msg)
-
         full_base = ctx.prefix + self._base_command_name
         used_alias = prefixless in alias_switch.values()
-        get_base_and_alias = lambda a: (
-            f"{full_base} {a}",
-            ctx.prefix + alias_switch[a])
-        base_or_alias = {a: get_base_and_alias(a) for a in ('add', 'edit')}
+        action = ""
+        msg = ctx.msg
+        body = msg.split(None, 1) if msg else ""
+        # else:
+            # Store syntax for commands in another file!
+            # return f"{ctx.cmd} syntax: {self._get_syntax(ctx.cmd)}"
+        #base_usage = cmd_add_or_edit.format_usage().strip("\n .")
+        #msg_usg_fmts = ("[message]", "MESSAGE")
+        #msg_usage_fmt = msg_usg_fmts[self._require_message]
+        #if not msg:
+        #    usage = dedent(f"""
+        #        {full_base} syntax: {full_base} {'|'.join(actions)}
+        #        [{base_usage.partition('[')[2]} {msg_usage_fmt}""")
+        #    return usage
 
-        if len(msg.split()) == 0:
-            return "Imagine a syntax message"
-        elif len(msg.split()) == 1:
+        if prefixless == self._base_command_name and body: # and len(body) >= 2:
+            (action, msg) = body if len(body) > 1 else (body[0], "")
+        else:  # If prefixless is in alias_switch.values()...
+            action = {v: k for k, v in alias_switch.items()}.get(prefixless)
+
+        if len(msg.split()) == 1:
             name, msg = (msg, "")
         else:
             name, msg = msg.split(None, 1) or (msg, "")
-        # get_action_error = (
-            # f"Failed to perform requested action",
-            # f"Failed to {action} command {name!r}"
-            # )[bool(name)]
+
+        get_base_and_alias = lambda a: (
+            f"{full_base} {a}",
+            ctx.prefix + alias_switch[a])
+        base_and_alias = {a: get_base_and_alias(a) for a in ('add', 'edit')}
+        base_or_alias = (
+            f"{full_base} {action}",
+            ctx.prefix + alias_switch[action])[used_alias]
+
+        base_usage = cmd_add_or_edit.format_usage().strip("\n .")
+        msg_usg_fmts = ("[message]", "MESSAGE")
+        msg_usage_fmt = msg_usg_fmts[self._require_message]
+        if not msg:
+            if action in ('delete', 'disable', 'enable', 'alias'):
+                usage = dedent(f"""
+                {base_or_alias} syntax:
+                {base_or_alias} COMMANDS""")
+                # {self._get_syntax(action)}"""
+                return usage
+            usage = dedent(f"""
+                {full_base} syntax: {full_base} {'|'.join(actions)}
+                [{base_usage.partition('[')[2]} {msg_usage_fmt}""")
+            return usage
+        return func_switch[action](channel_id, action, msg)
+
+        if action not in func_switch:
+            # usage = dedent(f"""
+                # {full_base} syntax: {full_base} {'|'.join(actions)}
+                # [{cmd_add_or_edit.partition('[')[2]} {msg_usage_fmt}""")
+            err = f"""
+                Invalid action: {action!r}.
+                {base_or_alias} syntax: {usage}"""
+                # {self._get_syntax(action)}"""
+            raise InvalidAction(dedent(err))
+
+        parsers = {'add': cmd_add_parser, 'edit': cmd_edit_parser}
+        add_or_edit_usage = parsers[action].format_usage().strip('\n .')
+        msg_usage_fmt = msg_usg_fmts[self._require_message and action == 'add']
+        usage = dedent(f"""
+            {base_or_alias} syntax: {base_or_alias} NAME
+            [{add_or_edit_usage.partition('[')[2]} {msg_usage_fmt}""")
+
+        if name in valid_parser_flags or not msg:
+            return usage
+            err =  f"""
+                Invalid syntax. The first argument of
+                {base_or_alias} must be a command name."""
+            raise InvalidSyntax(dedent(err))
+
         error_preface = f"Failed to {action} command {name!r}"
 
         update_err_dict = {
@@ -258,7 +305,7 @@ class Yeetrbot:
                     {error_preface}.
                     This command already exists. To change its message or
                     properties, use 
-                    {base_or_alias['edit'][used_alias]!r}."""))
+                    {base_and_alias['edit'][used_alias]!r}."""))
                 }, {
 
                 'test': name in self.built_ins,
@@ -276,50 +323,45 @@ class Yeetrbot:
                 'exc': CommandNotFoundError(dedent(f"""
                     {error_preface}.
                     This command does not exist.
-                    To add it, use {base_or_alias['add'][used_alias]!r}."""))
+                    To add it, use {base_and_alias['add'][used_alias]!r}."""))
                 },
             ]
         }
 
-        for err in update_err_dict[action]:
-            if err['test']:
-                raise err['exc']
-
         args = msg.split(' ')
         try:
-            if action == 'add':
-                parsed = cmd_add_parser.parse_args(args)
-            else: parsed = cmd_edit_parser.parse_args(args)
+            parsed = parsers[action].parse_args(args)
         except ParsingError as exc:
             raise ParsingError(f"{error_preface}. {exc.args[0].capitalize()}")
 
         cmd_dict = vars(parsed)
+        print(cmd_dict)
 
         if cmd_dict.get('help') is True:
-            return "Imagine this is a help message..."
-        else:
-            cmd_dict.pop('help')
+            args = msg.split()
+            print(repr(args))
+            # args = (k for k, v in cmd_dict.items() if v is not None)
+            # print(list(args))
+            resp = f"""
+                {base_or_alias[action][used_alias]} syntax:
+                {self._get_syntax(action, args)}"""
+            return dedent(resp)
+            return usage
 
-        for arg in ('name', 'new_name', 'aliases'):
-            if isinstance(cmd_dict.get(arg), list):
-                cmd_dict[arg] = cmd_dict[arg][0]
-
-        # name = cmd_dict.get('name')
-        new_name = cmd_dict.get('new_name')
-        aliases = cmd_dict.get('aliases')
-        message = ' '.join(cmd_dict['message'])
 
         cmd_dict.update(
             channel_id=channel_id,
             name=name,
-            message=message if message else None,
+            message= ' '.join(cmd_dict.get('message')) or None,
             action=action,
             modified_by=ctx.author_id,
             mtime=round(time.time()),
             base_name_or_alias=base_or_alias[action][used_alias]
         )
 
-        print("cmd_dict(after)=", cmd_dict)
+        for err in update_err_dict[action]:
+            if err['test']:
+                raise err['exc']
 
         if action in ('add', 'edit'):
             return func_switch[action](cmd_dict)
