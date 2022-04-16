@@ -41,17 +41,7 @@ class NameConflict(AssignmentError):
 
 
 class ParsingError(Exception):
-    '''Base exception for parsing errors'''
-    def __init__(self, message):
-        self.args = (message,)
-    def __str__(self):
-        return f"ParsingError: {self.args[0].capitalize()}"
-
-class ParsingIncomplete(ParsingError):
-    '''Raised when the current iteration of `parse_args()`
-    encounters an error, such as before the command name is
-    parsed or at the beginning of the message.'''
-    pass
+    '''Base exception for parsing errors.'''
 
 class InvalidArgument(ParsingError):
     '''Error raised when a parsed argument is counted as invalid.'''
