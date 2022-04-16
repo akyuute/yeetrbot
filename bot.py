@@ -10,6 +10,7 @@ from errors import (
     CommandNotFoundError,
     RegistrationError,
     NameConflict,
+    InvalidSyntax,
     ParsingError,
     DatabaseError,
     )
@@ -19,6 +20,7 @@ from base_classes import Yeetrbot
 from my_commands import string_commands
 # from my_commands.string_commands import derp, uwu, uhm
 
+CONFIG = Config(file="bot.conf")
 
 class ChatBot(commands.Bot, Yeetrbot):
     '''Base class for bot configs containing default commands and variables.'''
@@ -27,6 +29,17 @@ class ChatBot(commands.Bot, Yeetrbot):
         self._init_database(self._db_file)
         self._init_channels()
         self._init_commands()
+
+        self.syntaxes = {
+            'add': {
+                "": "Imagine this is the '!cmd add' syntax message.",
+                '--help': """Imagine this is the '!cmd add' help message."""
+                }, 
+            'edit': {
+                "": "Imagine this is the '!cmd edit' syntax message.",
+                '--help': """Imagine this is the '!cmd edit' help message."""
+                }
+            }
 
         self.display_name = config['CREDENTIALS']['bot_nick']
         initial_channels = config['CREDENTIALS']['initial_channels'].split()
@@ -68,8 +81,8 @@ class ChatBot(commands.Bot, Yeetrbot):
         await self.join_channels([ctx.author.name])
         await ctx.send(f"{ctx.author.mention}: {resp}")
 
-    @commands.command(name='cmd', aliases=('addcmd', 'editcmd', 'delcmd', 'disable', 'enable'))
-    #self._base_command_aliases
+    @commands.command(name=CONFIG.base_command_name,
+        aliases=tuple(CONFIG.base_command_aliases.values()))
     async def command_cmd(self, ctx: commands.Context):
         resp = ""
         if not ctx.author.is_mod:
@@ -90,12 +103,13 @@ class ChatBot(commands.Bot, Yeetrbot):
             RegistrationError,
             NameConflict,
             CommandNotFoundError,
+            InvalidSyntax,
             ParsingError,
             DatabaseError,
             NotImplementedError
         ) as exc:
             resp = exc.args[0]
-            print(repr(exc).replace("(", ": ", 1)[:-1])
+            print(str(exc.__class__))
         print("Response:", resp)
         await ctx.send(f"{ctx.author.mention}: {resp}")
 
@@ -106,7 +120,7 @@ class ChatBot(commands.Bot, Yeetrbot):
         # print(chatter.User.fetch_followers(()))
         # print(ctx.message.raw_data)
         # print(self._registry)
-        await ctx.send("I'm awake!")
+        # await ctx.send("I'm awake!")
     
         pass
 
