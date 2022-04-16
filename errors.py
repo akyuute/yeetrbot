@@ -40,25 +40,28 @@ class NameConflict(AssignmentError):
     pass
 
 
-class ParserError(Exception):
+class ParsingError(Exception):
     '''Base exception for parsing errors'''
-    pass
+    def __init__(self, message):
+        self.args = (message,)
+    def __str__(self):
+        return f"ParsingError: {self.args[0].capitalize()}"
 
-class ParsingIncomplete(ParserError):
+class ParsingIncomplete(ParsingError):
     '''Raised when the current iteration of `parse_args()`
     encounters an error, such as before the command name is
     parsed or at the beginning of the message.'''
     pass
 
-class InvalidArgument(ParserError):
+class InvalidArgument(ParsingError):
     '''Error raised when a parsed argument is counted as invalid.'''
     pass
 
-class InvalidSyntax(ParserError):
+class InvalidSyntax(ParsingError):
     '''Error raised when the syntax of a series of arguments is invalid.'''
     pass
 
-class InvalidAction(ParserError):
+class InvalidAction(ParsingError):
     '''Error raised when the first argument of a
     command string does not match a valid action.'''
     pass

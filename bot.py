@@ -5,7 +5,15 @@ import random
 import re
 import os
 
-from errors import *
+from errors import (
+    ChannelNotFoundError,
+    CommandNotFoundError,
+    RegistrationError,
+    NameConflict,
+    ParsingError,
+    DatabaseError,
+    )
+
 from parse_config import Config
 from base_classes import Yeetrbot
 from my_commands import string_commands
@@ -76,35 +84,18 @@ class ChatBot(commands.Bot, Yeetrbot):
         except ChannelNotFoundError as exc:
             resp = exc.args[0]
             print("Lookup error:")
-            # Ignore message: This channel is not registered
+            # Do nothing: This channel is not registered
             return
-        except RegistrationError as exc:
+        except (
+            RegistrationError,
+            NameConflict,
+            CommandNotFoundError,
+            ParsingError,
+            DatabaseError,
+            NotImplementedError
+        ) as exc:
             resp = exc.args[0]
-            print("Registration error:")
-        except NameConflict as exc:
-            resp = exc.args[0]
-            print("Name conflict:")
-        except CommandNotFoundError as exc:
-            resp = exc.args[0]
-            print("Lookup error:")
-        except DatabaseError as exc:
-            resp = exc.args[0]
-            print("Database error:")
-        except InvalidSyntax as exc:
-            resp = exc.args[0]
-            print("Parsing error:")
-        except InvalidArgument as exc:
-            resp = exc.args[0]
-            print("Parsing error:")
-        except InvalidAction as exc:
-            resp = exc.args[0]
-            print("Parsing error:")
-        except NotImplementedError as exc:
-            resp = exc.args[0]
-            print("Feature not implemented:")
-        except Exception as exc:
-            resp = "Unexpected error: " + exc.args[0]
-            raise
+            print(repr(exc).replace("(", ": ", 1)[:-1])
         print("Response:", resp)
         await ctx.send(f"{ctx.author.mention}: {resp}")
 
