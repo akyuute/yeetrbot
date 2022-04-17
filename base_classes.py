@@ -229,14 +229,14 @@ class Yeetrbot:
         # else:
             # Store syntax for commands in another file!
             # return f"{ctx.cmd} syntax: {self._get_syntax(ctx.cmd)}"
-        #base_usage = cmd_add_or_edit.format_usage().strip("\n .")
-        #msg_usg_fmts = ("[message]", "MESSAGE")
-        #msg_usage_fmt = msg_usg_fmts[self._require_message]
-        #if not msg:
-        #    usage = dedent(f"""
-        #        {full_base} syntax: {full_base} {'|'.join(actions)}
-        #        [{base_usage.partition('[')[2]} {msg_usage_fmt}""")
-        #    return usage
+        base_usage = cmd_add_or_edit.format_usage().strip("\n .")
+        msg_usg_fmts = ("[message]", "MESSAGE")
+        msg_usage_fmt = msg_usg_fmts[self._require_message]
+        if not msg:
+            usage = dedent(f"""
+                {full_base} syntax: {full_base} {'|'.join(actions)}
+                [{base_usage.partition('[')[2]} {msg_usage_fmt}""")
+            return usage
 
         if prefixless == self._base_command_name and body: # and len(body) >= 2:
             (action, msg) = body if len(body) > 1 else (body[0], "")
@@ -256,29 +256,15 @@ class Yeetrbot:
             f"{full_base} {action}",
             ctx.prefix + alias_switch[action])[used_alias]
 
-        base_usage = cmd_add_or_edit.format_usage().strip("\n .")
-        msg_usg_fmts = ("[message]", "MESSAGE")
-        msg_usage_fmt = msg_usg_fmts[self._require_message]
-        if not msg:
-            if action in ('delete', 'disable', 'enable', 'alias'):
-                usage = dedent(f"""
-                {base_or_alias} syntax:
-                {base_or_alias} COMMANDS""")
-                # {self._get_syntax(action)}"""
-                return usage
-            usage = dedent(f"""
-                {full_base} syntax: {full_base} {'|'.join(actions)}
-                [{base_usage.partition('[')[2]} {msg_usage_fmt}""")
-            return usage
-        return func_switch[action](channel_id, action, msg)
-
+        if action in ('delete', 'disable', 'enable', 'alias'):
+            return func_switch[action](channel_id, action, msg)
         if action not in func_switch:
             # usage = dedent(f"""
                 # {full_base} syntax: {full_base} {'|'.join(actions)}
                 # [{cmd_add_or_edit.partition('[')[2]} {msg_usage_fmt}""")
             err = f"""
                 Invalid action: {action!r}.
-                {base_or_alias} syntax: {usage}"""
+                {base_or_alias} usage: {usage}"""
                 # {self._get_syntax(action)}"""
             raise InvalidAction(dedent(err))
 
