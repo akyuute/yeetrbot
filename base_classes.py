@@ -239,12 +239,13 @@ class Yeetrbot:
             name, msg = msg.split(None, 1) or (msg, "")
 
         if action in ('delete', 'disable', 'enable', 'alias'):
-            if not msg:
+            names = set(ctx.msg.split())
+            if not names:
                 err = f"""
-                Invalid syntax. You must specify
-                at least one valid command name to {action}."""
+                Invalid syntax. Please specify at least
+                one valid command name to {action}."""
                 raise InvalidSyntax(dedent(err))
-            return func_switch[action](channel_id, action, msg)
+            return func_switch[action](channel_id, action, names)
 
         if action not in actions:
             err = f"""
@@ -445,10 +446,9 @@ class Yeetrbot:
         resp += f" and renamed it {new_name!r}." if new_name else "."
         return resp
 
-    def _toggle_command(self, channel_id, action: str, msg: str):
+    def _toggle_command(self, channel_id, action: str, names: set):
         '''Disable or enable a command by updating
         the database and in-memory dataclass.'''
-        names = set(msg.split())
         count = len(names)
         plur = "s" if count > 1 else ""
         error_preface = f"Failed to {action} {count} command{plur}"
@@ -482,9 +482,8 @@ class Yeetrbot:
         resp = f"Successfully {action}d {desc}."
         return resp
 
-    def _delete_command(self, channel_id: int, action: str, msg: str):
+    def _delete_command(self, channel_id: int, action: str, names):
         '''Delete a command, updating the database and in-memory dataclass.'''
-        names = set(msg.split())
         count = len(names)
         plur = "s" if count > 1 else ""
         error_preface = f"Failed to delete {count} command{plur}"
