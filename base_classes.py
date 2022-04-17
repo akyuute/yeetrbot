@@ -19,6 +19,7 @@ from errors import (
     CommandNotFoundError,
     RegistrationError,
     NameConflict,
+    InvalidAction,
     InvalidSyntax,
     ParsingError,
     DatabaseError,
@@ -209,7 +210,6 @@ class Yeetrbot:
             raise ChannelNotFoundError(err)
 
         alias_switch = self._base_command_aliases
-        actions = alias_switch.keys()
 
         func_switch = {
             'add': self._add_command,
@@ -221,22 +221,9 @@ class Yeetrbot:
         }
 
         prefixless = ctx.cmd.removeprefix(ctx.prefix)
-        full_base = ctx.prefix + self._base_command_name
-        used_alias = prefixless in alias_switch.values()
         action = ""
         msg = ctx.msg
         body = msg.split(None, 1) if msg else ""
-        # else:
-            # Store syntax for commands in another file!
-            # return f"{ctx.cmd} syntax: {self._get_syntax(ctx.cmd)}"
-        base_usage = cmd_add_or_edit.format_usage().strip("\n .")
-        msg_usg_fmts = ("[message]", "MESSAGE")
-        msg_usage_fmt = msg_usg_fmts[self._require_message]
-        if not msg:
-            usage = dedent(f"""
-                {full_base} syntax: {full_base} {'|'.join(actions)}
-                [{base_usage.partition('[')[2]} {msg_usage_fmt}""")
-            return usage
 
         if prefixless == self._base_command_name and body: # and len(body) >= 2:
             (action, msg) = body if len(body) > 1 else (body[0], "")
@@ -248,32 +235,38 @@ class Yeetrbot:
         else:
             name, msg = msg.split(None, 1) or (msg, "")
 
+        if action in ('delete', 'disable', 'enable', 'alias'):
+            return func_switch[action](channel_id, action, msg)
+
+        if action not in func_switch:
+            # base_usage = ctx.cmd + ' | '.join(actions)
+            actions = alias_switch.keys()
+            err = f"""
+                Invalid action: {action!r}. {ctx.cmd} usage:
+                '{ctx.cmd} {{{' | '.join(actions)}}} <command> [options ...]'"""
+                # {ctx.cmd} usage: {base_usage}"""
+                # {self._get_syntax(action)}"""
+            raise InvalidAction(dedent(err))
+
+        full_base = ctx.prefix + self._base_command_name  # Just use ctx.cmd for this.
         get_base_and_alias = lambda a: (
             f"{full_base} {a}",
             ctx.prefix + alias_switch[a])
         base_and_alias = {a: get_base_and_alias(a) for a in ('add', 'edit')}
+        used_alias = prefixless in alias_switch.values()
         base_or_alias = (
             f"{full_base} {action}",
-            ctx.prefix + alias_switch[action])[used_alias]
+            ctx.prefix + alias_switch.get(action, action))[used_alias]
 
-        if action in ('delete', 'disable', 'enable', 'alias'):
-            return func_switch[action](channel_id, action, msg)
-        if action not in func_switch:
-            # usage = dedent(f"""
-                # {full_base} syntax: {full_base} {'|'.join(actions)}
-                # [{cmd_add_or_edit.partition('[')[2]} {msg_usage_fmt}""")
-            err = f"""
-                Invalid action: {action!r}.
-                {base_or_alias} usage: {usage}"""
-                # {self._get_syntax(action)}"""
-            raise InvalidAction(dedent(err))
-
+        msg_repr_fmts = ("[message]", "<message>")
+        message_repr = msg_repr_fmts[self._require_message and action == 'add']
         parsers = {'add': cmd_add_parser, 'edit': cmd_edit_parser}
-        add_or_edit_usage = parsers[action].format_usage().strip('\n .')
-        msg_usage_fmt = msg_usg_fmts[self._require_message and action == 'add']
+        add_or_edit_usage = parsers[action].format_usage().strip(
+            '\n .').partition('[')[2].replace("ALIASES", "<aliases>")
         usage = dedent(f"""
-            {base_or_alias} syntax: {base_or_alias} NAME
-            [{add_or_edit_usage.partition('[')[2]} {msg_usage_fmt}""")
+            {base_or_alias} syntax: '{base_or_alias} <name>
+            [{add_or_edit_usage} {message_repr}'""")
+            # [{add_or_edit_usage.partition('[')[2]} {msg_usage_fmt}""")
 
         if name in valid_parser_flags or not msg:
             return usage
