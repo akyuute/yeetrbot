@@ -236,6 +236,11 @@ class Yeetrbot:
             name, msg = msg.split(None, 1) or (msg, "")
 
         if action in ('delete', 'disable', 'enable', 'alias'):
+            if not msg:
+                err = f"""
+                Invalid syntax. You must specify
+                at least one valid command name to {action}."""
+                raise InvalidSyntax(dedent(err))
             return func_switch[action](channel_id, action, msg)
 
         if action not in func_switch:
@@ -266,14 +271,15 @@ class Yeetrbot:
         usage = dedent(f"""
             {base_or_alias} syntax: '{base_or_alias} <name>
             [{add_or_edit_usage} {message_repr}'""")
-            # [{add_or_edit_usage.partition('[')[2]} {msg_usage_fmt}""")
 
-        if name in valid_parser_flags or not msg:
-            return usage
+        if name in valid_parser_flags:
+            new_or_existing = ("an existing", "a new")[action == 'add']
             err =  f"""
                 Invalid syntax. The first argument of
-                {base_or_alias} must be a command name."""
+                {base_or_alias} must be {new_or_existing} command name."""
             raise InvalidSyntax(dedent(err))
+        elif not msg:
+            return usage
 
         error_preface = f"Failed to {action} command {name!r}"
 
