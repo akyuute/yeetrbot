@@ -210,7 +210,7 @@ class Yeetrbot:
             raise ChannelNotFoundError(err)
 
         alias_switch = self._base_command_aliases
-
+        actions = alias_switch.keys()
         func_switch = {
             'add': self._add_command,
             'edit': self._edit_command,
@@ -219,13 +219,16 @@ class Yeetrbot:
             'enable': self._toggle_command,
             'alias': self._edit_command
         }
-
         prefixless = ctx.cmd.removeprefix(ctx.prefix)
+        prefix_base = ctx.prefix + self._base_command_name
+        base_opts = "<command> [options ...]"
+        base_usage = f"{prefix_base} {{{' | '.join(actions)}}} {base_opts}"
+
         action = ""
         msg = ctx.msg
         body = msg.split(None, 1) if msg else ""
 
-        if prefixless == self._base_command_name and body: # and len(body) >= 2:
+        if prefixless == self._base_command_name and body:
             (action, msg) = body if len(body) > 1 else (body[0], "")
         else:  # If prefixless is in alias_switch.values()...
             action = {v: k for k, v in alias_switch.items()}.get(prefixless)
@@ -243,24 +246,19 @@ class Yeetrbot:
                 raise InvalidSyntax(dedent(err))
             return func_switch[action](channel_id, action, msg)
 
-        if action not in func_switch:
-            # base_usage = ctx.cmd + ' | '.join(actions)
-            actions = alias_switch.keys()
+        if action not in actions:
             err = f"""
-                Invalid action: {action!r}. {ctx.cmd} usage:
-                '{ctx.cmd} {{{' | '.join(actions)}}} <command> [options ...]'"""
-                # {ctx.cmd} usage: {base_usage}"""
-                # {self._get_syntax(action)}"""
+                Invalid action: {action!r}.
+                {ctx.cmd} usage: {base_usage!r}"""
             raise InvalidAction(dedent(err))
 
-        full_base = ctx.prefix + self._base_command_name  # Just use ctx.cmd for this.
         get_base_and_alias = lambda a: (
-            f"{full_base} {a}",
+            f"{prefix_base} {a}",
             ctx.prefix + alias_switch[a])
         base_and_alias = {a: get_base_and_alias(a) for a in ('add', 'edit')}
         used_alias = prefixless in alias_switch.values()
         base_or_alias = (
-            f"{full_base} {action}",
+            f"{prefix_base} {action}",
             ctx.prefix + alias_switch.get(action, action))[used_alias]
 
         msg_repr_fmts = ("[message]", "<message>")
@@ -341,7 +339,7 @@ class Yeetrbot:
             action=action,
             modified_by=ctx.author_id,
             mtime=round(time.time()),
-            base_name_or_alias=base_or_alias[action][used_alias]
+            base_or_alias=base_or_alias
         )
 
         for err in update_err_dict[action]:
@@ -361,7 +359,7 @@ class Yeetrbot:
         channel_id = cmd_dict['channel_id']
         name = cmd_dict['name']
         cmd_dict.pop('action')
-        base_name_or_alias = cmd_dict.pop('base_name_or_alias')
+        base_or_alias = cmd_dict.pop('base_or_alias')
 
         error_preface = f"Failed to add command {name!r}"
         err = ""
@@ -397,7 +395,7 @@ class Yeetrbot:
         name = cmd_dict.pop('name')
         new_name = cmd_dict.pop('new_name', None)
         modified_by = cmd_dict
-        base_name_or_alias = cmd_dict.pop('base_name_or_alias')
+        base_or_alias = cmd_dict.pop('base_or_alias')
         action = cmd_dict.pop('action')
 
         error_preface = f"Falied to update command {name!r}"
