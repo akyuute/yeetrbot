@@ -3,7 +3,7 @@
 import argparse
 from errors import ParsingError
 
-valid_parser_flags = ('--help', '-h', '--permissions', '-p', '--aliases', '-a',
+valid_parser_flags = ('--permissions', '-p', '--aliases', '-a',
        '--count', '-c', '--disable', '-d', '--hide', '-i', '--unhide', '-u')
 
 class QuietParser(argparse.ArgumentParser):

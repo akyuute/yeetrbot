@@ -17,8 +17,7 @@ from errors import (
 
 from parse_config import Config
 from base_classes import Yeetrbot
-from my_commands import string_commands
-# from my_commands.string_commands import derp, uwu, uhm
+import built_in_commands
 
 CONFIG = Config(file="bot.conf")
 
@@ -30,16 +29,20 @@ class ChatBot(commands.Bot, Yeetrbot):
         self._init_channels()
         self._init_commands()
 
+        # self.built_ins = {
+            # k: v for k, v in vars(built_in_commands).items() if
+            # inspect.isfunction(v) and not k.startswith('_')}
+
         self.syntaxes = {
             'add': {
                 "": "Imagine this is the '!cmd add' syntax message.",
                 '--help': """Imagine this is the '!cmd add' help message."""
-                }, 
+            }, 
             'edit': {
                 "": "Imagine this is the '!cmd edit' syntax message.",
                 '--help': """Imagine this is the '!cmd edit' help message."""
-                }
             }
+        }
 
         self.display_name = config['CREDENTIALS']['bot_nick']
         initial_channels = config['CREDENTIALS']['initial_channels'].split()
@@ -166,7 +169,7 @@ class StrCommands(commands.Cog):
     @commands.command(name="!uwu")
     async def command_uwu(self, ctx: commands.Context):
         msg = ctx.msg
-        resp = string_commands.uwu(msg)
+        resp = built_in_commands.uwu(msg)
         # error_occurred = len(resp) == 2
         if len(resp) == 2:
             error_occurred = resp[1] != 0
@@ -182,7 +185,7 @@ class StrCommands(commands.Cog):
     @commands.command(name="derp")
     async def command_derp(self, ctx: commands.Context):
         msg = ctx.msg
-        resp = string_commands.derp(msg)
+        resp = built_in_commands.derp(msg)
         if len(resp) == 2:
             error_occurred = resp[1] != 0
             if error_occurred:

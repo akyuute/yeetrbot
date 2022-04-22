@@ -3,15 +3,15 @@ import sys
 import time
 import random
 import sqlite3
+import inspect
 import dataclasses as dc
-from typing import Callable
 from textwrap import dedent
 from argparse import ArgumentParser
 from configparser import ConfigParser
 from twitchio.ext.commands import Context
 
-from my_commands import string_commands
-import my_commands.built_ins as built_in_commands
+# from built_in_commands import core_commands, text_commands, math_commands
+import built_in_commands
 from parsing import (cmd_add_parser, cmd_edit_parser,
     cmd_add_or_edit, valid_parser_flags)
 from errors import (
@@ -24,7 +24,7 @@ from errors import (
     ParsingError,
     DatabaseError,
     )
-
+ 
 
 @dc.dataclass(slots=True)
 class RegisteredChannel:
@@ -94,22 +94,12 @@ class Yeetrbot:
         print("--> ", channel.display_name, ctx.cmd, ctx.msg)
 
     def _init_database(self, db_file: str):
-        '''Connects to the sqlite3 database and creates tables if necessary.'''
+        '''Connects to the sqlite3 database and creates it if necessary.'''
         self._db_conn = sqlite3.connect(db_file)
         self._db = self._db_conn.cursor()
         with self._db_conn:
             with open('db/schema.sql', 'r') as f:
                 self._db.executescript(f.read())
-            #for stmt in _create_tables:
-                #self._db.execute(stmt)
-        self._built_ins = {k: v for k, v in built_in_commands.__dict__.items()
-                           if isinstance(v, Callable)}
-        self.built_ins = [f.__name__ for f in self._built_ins.values()
-                          if not f.__name__.startswith('_')]
-        # self._defaults = {k: v for k, v in default_commands.__dict__.items()
-        #                   if isinstance(v, Callable)}
-        # self.defaults = [f.__name__ for f in self._defaults.values()
-        #                  if not f.__name__.startswith('_')]
 
     def _init_channels(self):
         '''Retrieves channel records from the database and
@@ -131,25 +121,27 @@ class Yeetrbot:
         for record in records:
             cmd = RegisteredCommand(*record)
             self._registry[cmd.channel_id].commands[cmd.name] = cmd
- 
-    # @property
-    # def channels(self):
-        # '''A list of registered channel names.'''
-        # return [c.username for c in self._registry.values()]
+        self.built_ins = {
+            k: v for k, v in vars(built_in_commands).items() if
+            inspect.isfunction(v) and not k.startswith('_')}
 
+ 
     @property
     def registered_channels(self) -> list:
-        registered_channels = [c.username for uid, c in self._registry.items()]
-        return registered_channels
+        channels = [c.username for uid, c in self._registry.items()]
+        return channels
 
     def get_commands(self, channel_id: int) -> list:
         return list(self._registry[channel_id].commands)
+        # return (c for c in self._registry[channel_id].commands)
 
     def _get_syntax(self, command: str, args="", syntaxes: dict = None):
         '''Returns the syntax/usage statement of a built-in command. Raises
         `CommandNotFoundError` if the command does not exist.'''
         if syntaxes is None:
             syntax = self.syntaxes[command]
+        else:
+            syntax = syntaxes[command]
         # if command not in self.built_ins:
             # err = f"Built-in command {command!r} does not exist."
             # raise CommandNotFoundError(err)
@@ -266,19 +258,31 @@ class Yeetrbot:
         message_repr = msg_repr_fmts[self._require_message and action == 'add']
         parsers = {'add': cmd_add_parser, 'edit': cmd_edit_parser}
         add_or_edit_usage = parsers[action].format_usage().strip(
-            '\n .').partition('[')[2].replace("ALIASES", "<aliases>")
+            '\n .').partition('[')[2].replace(
+                "ALIASES", "<aliases>").replace("COUNT", "<count>")
         usage = dedent(f"""
             {base_or_alias} syntax: '{base_or_alias} <name>
             [{add_or_edit_usage} {message_repr}'""")
 
-        if name in valid_parser_flags:
-            new_or_existing = ("an existing", "a new")[action == 'add']
+        if name in valid_parser_flags or not msg:
+            if name in ('--help', '-h'):
+                args = msg.split()
+                print("name:", name)
+                print("Got --help in", repr([name] + args))
+                # args = (k for k, v in cmd_dict.items() if v is not None)
+                # print(list(args))
+                resp = f"""
+                    {base_and_alias[action][used_alias]} syntax:
+                    {self._get_syntax(action, args)}"""
+                return dedent(resp)
+                return usage
+            existing_or_new = ("an existing", "a new")[action == 'add']
             err =  f"""
                 Invalid syntax. The first argument of
-                {base_or_alias} must be {new_or_existing} command name."""
+                {base_or_alias} must be {existing_or_new} command name."""
             raise InvalidSyntax(dedent(err))
-        elif not msg:
-            return usage
+        # elif not msg:
+            # return usage
 
         error_preface = f"Failed to {action} command {name!r}"
 
@@ -319,15 +323,14 @@ class Yeetrbot:
             raise ParsingError(f"{error_preface}. {exc.args[0].capitalize()}")
 
         cmd_dict = vars(parsed)
-        print(cmd_dict)
 
         if cmd_dict.get('help') is True:
             args = msg.split()
-            print(repr(args))
+            print("Got --help in", repr(args))
             # args = (k for k, v in cmd_dict.items() if v is not None)
             # print(list(args))
             resp = f"""
-                {base_or_alias[action][used_alias]} syntax:
+                {base_and_alias[action][used_alias]} syntax:
                 {self._get_syntax(action, args)}"""
             return dedent(resp)
             return usage
@@ -342,6 +345,7 @@ class Yeetrbot:
             mtime=round(time.time()),
             base_or_alias=base_or_alias
         )
+        print("cmd_dict: ", cmd_dict)
 
         for err in update_err_dict[action]:
             if err['test']:
@@ -374,7 +378,7 @@ class Yeetrbot:
 
         attrs = {k: v for k, v in cmd_dict.items() if v is not None}
         cmd = RegisteredCommand(**attrs)
-        print("cmd=", dc.asdict(cmd))
+        # print("cmd = ", dc.asdict(cmd))
 
         self._registry[channel_id].commands[name] = cmd
         cols, vals = zip(*dc.asdict(cmd).items())
@@ -394,7 +398,8 @@ class Yeetrbot:
         channel_id = cmd_dict['channel_id']
         commands = self._registry[channel_id].commands
         name = cmd_dict.pop('name')
-        new_name = cmd_dict.pop('new_name', None)
+        new_name = cmd_dict.pop('new_name')
+        new_name = new_name[0] if isinstance(new_name, list) else None
         modified_by = cmd_dict
         base_or_alias = cmd_dict.pop('base_or_alias')
         action = cmd_dict.pop('action')
