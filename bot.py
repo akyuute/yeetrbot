@@ -166,7 +166,7 @@ class StrCommands(commands.Cog):
         self.bot = bot
         pass
 
-    @commands.command(name="!uwu")
+    @commands.command(name="uwu")
     async def command_uwu(self, ctx: commands.Context):
         msg = ctx.msg
         resp = built_in_commands.uwu(msg)
