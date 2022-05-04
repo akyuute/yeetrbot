@@ -13,7 +13,7 @@ from twitchio.ext.commands import Context
 # from built_in_commands import core_commands, text_commands, math_commands
 import built_in_commands
 from parsing import (cmd_add_parser, cmd_edit_parser,
-    cmd_add_or_edit, valid_parser_flags)
+    cmd_add_or_edit, VALID_PARSER_FLAGS)
 from errors import (
     ChannelNotFoundError,
     CommandNotFoundError,
@@ -264,7 +264,7 @@ class Yeetrbot:
             {base_or_alias} syntax: '{base_or_alias} <name>
             [{add_or_edit_usage} {message_repr}'""")
 
-        if name in valid_parser_flags or not msg:
+        if name in VALID_PARSER_FLAGS or not msg:
             if name in ('--help', '-h'):
                 args = msg.split()
                 print("name:", name)
