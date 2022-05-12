@@ -5,60 +5,56 @@ pragma synchronous = off;
 create table if not exists chatter (
     id integer primary key
     , name text unique not null
-    , display_name text unique not null
-    , history text
+    -- , display_name text unique not null
 );
 
 create table if not exists channel (
     id integer primary key
-    -- id text primary key
     , name text unique not null
-    , display_name text unique not null
-    -- , history text
+    , join_date int not null
 );
 
 create table if not exists user_presence (
     id integer unique not null
     , user_id integer not null
     , channel_id integer not null
-    , primary key(user_id, channel_id)
-    , foreign key(user_id) references chatter(id)
-    , foreign key(channel_id) references channel(id)
+    , user_rank text
+    , messages_sent integer not null
+    , active_since integer not null
+    , primary key (user_id, channel_id)
+    , foreign key (user_id) references chatter(id)
+    , foreign key (channel_id) references channel(id)
 );
 
-create table if not exists user_chan_data (
-    presence_id integer primary key
-    , rank text
-    , msgs_sent integer
-    , watched_since text
-    , history text
-    , foreign key(presence_id) references user_presence(id)
-);
-
-create table if not exists variable (
-    id integer primary key
-    , var_name text unique not null
-);
-
-create table if not exists chan_var (
+create table if not exists custom_variable (
     id integer primary key
     , channel_id integer not null
-    , var_id integer not null
+    , name text
     , value text
-    , foreign key(channel_id) references channel(id)
-    , foreign key(var_id) references variable(id)
+    , foreign key (channel_id) references channel(id)
 );
 
-create table if not exists user_var (
+create table if not exists built_in_command (
     id integer primary key
-    , user_id integer not null
-    , var_id integer not null
-    , value text
-    , foreign key(user_id) references chatter(id)
-    , foreign key(var_id) references variable(id)
+    , name text not null
+    , global_aliases text
 );
 
-create table if not exists command (
+create table if not exists channel_built_in (
+    channel_id integer not null
+    , command_id integer not null
+    , aliases text
+    , perms text not null
+    , count integer
+    , cooldowns text -- e.g.: "10,5,0,'Weebs':30" for (Everyone,VIP,Moderator,<Rank(name='Weebs')>)
+    , is_enabled integer not null
+    , is_hidden integer not null
+    , primary key (channel_id, command_id)
+    , foreign key (command_id) references built_in_command(id)
+    , foreign key (channel_id) references channel(id)
+);
+
+create table if not exists custom_command (
     id integer primary key
     , channel_id integer not null
     , name text unique not null
@@ -66,21 +62,16 @@ create table if not exists command (
     , aliases text
     , perms text not null
     , count integer
+    , cooldowns text -- e.g.: "3,10,5,0,'Weebs':30" for (Global,Everyone,VIP,Moderator,<Rank(name='Weebs')>)
+    , case_sensitive integer not null
+    , expire integer
+    , expire_action text
     , is_enabled integer not null
     , is_hidden integer not null
     , author_id integer not null
     , modified_by integer not null
-    -- , override_builtin integer -- not null
+    -- , is_builtin integer not null
     , ctime integer not null
     , mtime integer not null
-    , foreign key(channel_id) references channel(id)
-);
-
-create table if not exists user_cmd_data (
-    user_id integer not null
-    , cmd_id integer not null
-    , user_cmd_count integer
-    , foreign key(user_id) references chatter(id)
-    , foreign key(cmd_id) references command(id)
-    , primary key(user_id, cmd_id)
+    , foreign key (channel_id) references channel(id)
 );

@@ -6,52 +6,50 @@ class BotError(Exception):
     pass
 
 class DatabaseError(BotError):
-    '''Exception raised for errors in a database transaction.'''
+    '''Base exception for errors that occur in a database transaction.'''
     pass
 
-class AssignmentError(BotError):
-    '''Base exception for errors in attribute assignment operations.'''
-    # def __init__(self, attr, message=None):
-        # self.attr = attr
-        # if message is not None:
-            # super.__init__(self, message)
-        # else:
-            # super.__init__(self, )
+class RegistrationError(BotError):
+    '''Base exception for errors that occur when registering new channels or
+    commands and their attributes.'''
     pass
 
-class RegistrationError(AssignmentError):
-    '''Exception raised for errors in registering channel attributes.'''
+class NotFoundError(BotError):
+    '''Base exception for failed object lookups.'''
     pass
 
-class ChannelNotFoundError(AssignmentError):
-    '''Exception raised when a channel cannot be found.'''
-    pass
-
-class CommandNotFoundError(AssignmentError):
-    '''Exception raised when a command cannot be found.'''
-    pass
-
-class VariableNotFoundError(AssignmentError):
-    '''Exception raised when a variable cannot be found.'''
-    pass
-
-class NameConflict(AssignmentError):
-    '''Exception raised when one attribute name conflicts with another.'''
+class ParsingError(BotError):
+    '''Base exception for errors that occur when parsing input.'''
     pass
 
 
-class ParsingError(Exception):
-    '''Base exception for parsing errors.'''
+class NameConflict(RegistrationError): ...
+    #'''Error raised when the name of a new object conflicts with that of one
+    #which already exists.'''
+    #pass
 
-class InvalidArgument(ParsingError):
-    '''Error raised when a parsed argument is counted as invalid.'''
-    pass
 
-class InvalidSyntax(ParsingError):
-    '''Error raised when the syntax of a series of arguments is invalid.'''
-    pass
+class ChannelNotFoundError(NotFoundError): ...
+    #'''Error raised when a channel cannot be identified.'''
+    #pass
 
-class InvalidAction(ParsingError):
-    '''Error raised when the first argument of a
-    command string does not match a valid action.'''
-    pass
+class CommandNotFoundError(NotFoundError): ...
+    #'''Error raised when a custom channel command cannot be identified.'''
+    #pass
+
+class VariableNotFoundError(NotFoundError): ...
+    #'''Error raised when a custom channel variable cannot be identified.'''
+    #pass
+
+
+class InvalidArgument(ParsingError): ...
+    #'''Error raised when a parsed argument is flagged as invalid.'''
+    #pass
+
+class InvalidSyntax(ParsingError): ...
+    #'''Error raised when the syntax of one or more arguments is invalid.'''
+    #pass
+
+class InvalidAction(ParsingError): ...
+    #'''Error raised when certain arguments of a command string does not represent a valid action.'''
+    #pass

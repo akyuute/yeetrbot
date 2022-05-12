@@ -5,8 +5,16 @@ from utils import split_nth, join_with_or
 from errors import ParsingError, InvalidArgument
 
 
-VALID_PARSER_FLAGS = ('--permissions', '-p', '--aliases', '-a',
-       '--count', '-c', '--disable', '-d', '--hide', '-i', '--unhide', '-u')
+CMD_ARGUMENT_FLAGS = (
+       '--permissions', '-p',
+       '--aliases', '-a',
+       '--count', '-c', 
+       '--cases', '-i',
+       '--no-cases', '-I',
+       '--disable', '-d',
+       '--enable', '-e',
+       '--hide', '--unhide')
+
 GROUP_DELIMITERS = "()[]{}<>\"\"''"
 
 class QuietParser(argparse.ArgumentParser):
@@ -59,8 +67,14 @@ class GroupByDelimiter(argparse.Action):
             i = self.delimiters.index(argstr[0])
         except ValueError:
             delim_opts = join_with_or(tuple(split_nth(self.delimiters, 2)))
-            e = (f"Argument {self.slash_names} must be escaped with {delim_opts} "
-                 f"when followed by other arguments.")
+            e = (f"The {self.slash_names!r} argument must be escaped with "
+                 f"{delim_opts} when it is longer than one word or followed "
+                 f"by other arguments.")
+            e = " ".join(line.strip() for line in f"""
+                The {self.slash_names!r} argument must be escaped with
+                {delim_opts} when it is longer than one word or followed by
+                other arguments.""".splitlines())
+            # raise InvalidArgument(" ".join(line.strip() for line in e.splitlines()))
             raise InvalidArgument(e)
 
         start, end = self.delimiters[i:][:2]
@@ -90,6 +104,9 @@ cmd_add_or_edit.add_argument('--perms', '-p',
 cmd_add_or_edit.add_argument('--aliases', '-a', nargs=1)
 cmd_add_or_edit.add_argument('--count', '-c', type=int)
 
+cmd_add_or_edit.add_argument('--case-sensitive', '-I',
+    )
+
 cmd_add_or_edit.add_argument('--disable', '-d',
     action='store_false',
     dest='is_enabled')
@@ -98,11 +115,11 @@ cmd_add_or_edit.add_argument('--enable', '-e',
     action='store_true',
     dest='is_enabled')
 
-cmd_add_or_edit.add_argument('--hide', '-i',
+cmd_add_or_edit.add_argument('--hide',
     action='store_true',
     dest='is_hidden')
 
-cmd_add_or_edit.add_argument('--unhide', '-u',
+cmd_add_or_edit.add_argument('--unhide',
     action='store_false',
     dest='is_hidden')
 
