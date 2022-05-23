@@ -1,39 +1,57 @@
 from utils import str_to_bool
+# import parse_commands
 import twitchio
+from twitchio.ext.commands import Context as TwitchIOContext
 import sys
 import time
 import inspect
-from typing import Iterable, Dict, Tuple
+import itertools
+from collections import OrderedDict
+from typing import Iterable, Dict, Tuple, Callable
 import dataclasses as dc
 from configparser import ConfigParser
 from argparse import ArgumentParser
+from pathlib import Path
+import strictyaml as yaml
 
 
-class Config(ConfigParser):
-    '''Class for objects with data from config files.'''
-    def __init__(self, file):
+class Config:
+    def __init__(self, file: Path = None):
         cli_parser = ArgumentParser()
         cli_parser.add_argument('--config')
-
-        super().__init__(empty_lines_in_values=False)
         config_file = cli_parser.parse_args(sys.argv[1:]).config or file
+
         with open(config_file, 'r') as f:
-            self.read_file(f)
-        self.file = file
+            raw_data = f.read()
+        self.__dict__ = yaml.load(raw_data).data
+        self.file = config_file
+        self.bot['heartbeat'] = float(self.bot.get('heartbeat', 30))
 
-        cmd_conf = self['COMMANDS']
-        require_message = self['COMMANDS'].get('require_message', "t")
-        override_builtins = self['COMMANDS'].get('override_builtins', "t")
-        case_sensitive = self['COMMANDS'].get('case_sensitive', "f")
+        cmds = self.commands
+        default_perms = cmds.get('default_perms', "everyone")
+        channels_set_min_perms = cmds.get('channels_set_min_perms', "t")
+        default_count = cmds.get('default_count', 0)
+        case_sensitive = cmds.get('case_sensitive', "f")
+        channels_set_case = cmds.get('channels_set_case', "f")
+        require_message = cmds.get('require_message', "t")
 
-        self.require_message = str_to_bool(require_message)
-        self.override_builtins = str_to_bool(override_builtins)
-        self.case_sensitive = str_to_bool(case_sensitive)
+        cmds['default_perms'] = default_perms
+        cmds['channels_set_min_perms'] = str_to_bool(channels_set_min_perms)
+        cmds['default_count'] = int(default_count)
+        cmds['case_sensitive'] = str_to_bool(case_sensitive)
+        cmds['chnls_set_case'] = str_to_bool(channels_set_case)
+        cmds['require_message'] = str_to_bool(require_message)
+        #cmds['core_built_ins']['manage_commands']['func_switch'] = {
+        #    'add': parse_commands.add_command,
+        #    'edit': parse_commands.edit_command,
+        #    'delete': parse_commands.delete_command,
+        #    'disable': parse_commands.toggle_command,
+        #    'enable': parse_commands.toggle_command,
+        #    #'alias': parse_command.edit_command
+        #}
 
-        self.base_command_name = cmd_conf['base_command_name']
-        aliases = (a for a in cmd_conf.items() if '_command_alias' in a[0])
-        alias_dict = {k.removesuffix('_command_alias'): v for k, v in aliases}
-        self.base_command_aliases = alias_dict
+        # override_builtins = self.commands.get('override_builtins', "t")
+        # self.commands['override_builtins'] = str_to_bool(override_builtins)
 
 
 class RegisteredChannel(twitchio.Channel):
@@ -43,34 +61,90 @@ class RegisteredChannel(twitchio.Channel):
         'id',
         'name',
         'join_date',
+        'case_sensitive_commands',
         '_command_aliases',
         '_keyword_aliases',
+        # '_alias_lookup',
         '_custom_variables',
+        'bot',
         '_ws',
         )
 
     def __init__(self, uid: int, name: str, join_date: int = None, bot=None):
         if bot is not None:
             super().__init__(name, bot._connection)
-        self.id = uid
+            self.bot = bot
+        self.id = int(uid)
         self.name = name
         self.join_date = round(time.time()) if join_date is None else join_date
         # self.join_date = join_date or round(time.time()) or 0
+        # self.case_sensitive_commands = None
         self._command_aliases = {}
         self._keyword_aliases = {}
         self._custom_variables = {}
 
     def __repr__(self):
         name = self.name[:8] + "..." if len(self.name) > 16 else self.name
-        return f"<{self.__class__.__name__}(name={name}, id={self.id})>"
+        return f"<{self.__class__.__name__}({name=}, id={self.id})>"
 
-    async def resolve_command(self, name: str):
-        command = self._command_aliases.get(name, None)
-        return command
+    # async def resolve_command(self, name: str):
+        # command = self._command_aliases.get(name, None)
+        # return command
+
+    @property
+    def _alias_lookup(self):
+        # return tuple(self.custom_command_aliases.items())
+        # return OrderedDict(self.custom_command_aliases)
+        cmds = self.custom_command_aliases.items()
+        bins = self.built_in_aliases.items()
+        default = self.bot._built_in_command_aliases.items() or ((None, None))
+        # print("built-ins at lookup:", default)
+        lookup = itertools.chain(cmds, bins, default)
+        return lookup
+
+    @property
+    def all_the_aliases(self):
+        # cmds = OrderedDict(
+        #cmds = dict(
+        cmds = (
+                (a.lower(), c) for a, c in self._command_aliases.items()
+                if isinstance(c, CustomCommand)
+        )
+        if self.bot is None:
+            # return OrderedDict(cmds)
+            return dict(cmds)
+        bins = (
+                (a.lower(), c) for a, c in self.bot._built_in_command_aliases.items()
+                if isinstance(c, BuiltInCommand)
+        )
+        print("cmds:", tuple(cmds))
+        print("bins:", tuple(bins))
+        print(tuple(itertools.chain(cmds, bins)))
+        return itertools.chain(cmds, bins)
+
+        # cmds.update(self.bot._built_in_command_aliases.items())
+        # return OrderedDict(itertools.chain(
+            # self._command_aliases.items(),
+            # self.bot._built_in_command_aliases.items()
+            # ))
 
     @property
     def display_name(self) -> str:
         return NotImplemented
+
+    @property
+    def custom_command_aliases(self) -> dict:
+        return {a.lower(): c for a, c in self._command_aliases.items()
+                if isinstance(c, CustomCommand)
+                # and c.is_enabled
+                }
+
+    @property
+    def built_in_aliases(self) -> dict:
+        return {a.lower(): c for a, c in self._command_aliases.items()
+                if isinstance(c, BuiltInCommand)
+                # and c.is_enabled
+                }
 
     @property
     def custom_commands(self) -> set:
@@ -78,19 +152,9 @@ class RegisteredChannel(twitchio.Channel):
                    if isinstance(c, CustomCommand))
 
     @property
-    def custom_command_aliases(self) -> dict:
-        return {a: c for a, c in self._command_aliases.items()
-                if isinstance(c, CustomCommand)}
-
-    @property
     def built_ins(self) -> set:
         return set(c for c in self._command_aliases.values()
                    if isinstance(c, BuiltInCommand))
-
-    @property
-    def built_in_aliases(self) -> dict:
-        return {a: c for a, c in self._command_aliases.items()
-                if isinstance(c, BuiltInCommand)}
 
     @property
     def variables(self):
@@ -105,7 +169,7 @@ class UserScope:
         self._parent = parent
         self._check = None
 
-    def qualifies(self, context: twitchio.ext.commands.Context) -> bool:
+    def qualifies(self, context) -> bool:
         pass
 
 
@@ -113,7 +177,7 @@ class Rank(UserScope):
     pass
 
 
-class Context(twitchio.ext.commands.Context):
+class Context(TwitchIOContext):
     def __init__(self, bot, message: twitchio.Message):
         self.bot = bot
         channel_id = int(message.tags['room-id'])
@@ -144,51 +208,27 @@ class Context(twitchio.ext.commands.Context):
 
 @dc.dataclass(slots=True)
 class CustomCommand:
-
-#    __slots__ = (
-#        "name",
-#        "message",
-#        "channel_id",
-#        "author_id",
-#        "modified_by",
-#        "aliases",
-#        "perms",
-#        "count",
-#        "cooldowns",
-#        "case_sensitive",
-#        "is_hidden",
-#        "is_enabled",
-#        "ctime",
-#        "mtime",
-#        "expire",
-#        )
-
-#    def __init__(
-#        self,
-#        **attrs
-#        ):
-
-        _: dc.KW_ONLY
-        name: str
-        message: str
-        channel_id: int
-        author_id: int
-        name: str
-        message: str
-        channel_id: int
-        author_id: int
-        modified_by: int = None
-        aliases: Iterable[str] = None
-        perms: str = None
-        count: int = None
-        cooldowns: Dict[Rank, int] = dc.field(default_factory=dict)
-        case_sensitive: bool = False
-        is_hidden: bool = False
-        is_enabled: bool = True
-        # Times in seconds since epoch; use time.gmtime() to convert to UTC
-        ctime: int = round(time.time())
-        mtime: int = round(time.time())
-        expire: Tuple[int, str] = None
+    _: dc.KW_ONLY
+    name: str
+    message: str
+    channel_id: int
+    author_id: int
+    name: str
+    message: str
+    channel_id: int
+    author_id: int
+    modified_by: int = None
+    aliases: Iterable[str] = dc.field(default_factory=list)
+    perms: str = None
+    count: int = None
+    cooldowns: Dict[Rank, int] = dc.field(default_factory=dict)
+    case_sensitive: bool = False
+    is_hidden: bool = False
+    is_enabled: bool = True
+    # Times in seconds since epoch; use time.gmtime() to convert to UTC
+    ctime: int = round(time.time())
+    mtime: int = round(time.time())
+    expire: Tuple[int, str] = None
 
     async def __call__(self, context: Context) -> None:
         await self.invoke(context)
@@ -203,36 +243,49 @@ class CustomCommand:
 @dc.dataclass(slots=True)
 class BuiltInCommand:
 
-#    def __init__(self, name: str, func, **attrs):
-#        self.name = name
-#        self.callback = func
-#        self.instance = None
-#        self.channel_id = attrs.get('channel_id', None)
-#        self.syntax = attrs.get('syntax', None)
-#        self.aliases: Iterable[str] = attrs.get('aliases', None)
-#        self.perms: str | dict = attrs.get('perms', None)
-#        self.count: int = attrs.get('count', None)
-#        self.cooldowns: Dict[str|Rank, int] = attrs.get('cooldowns', None)
-#        self.case_sensitive = attrs.get('case_sensitive', False)
-    
-        _: dc.KW_ONLY
-        name: str
-        callback: Callable[[Context], None]
-        channel_id: int # = None
-        # instance # = None
-        aliases: Iterable[str] = None
-        perms: str = None
-        count: int = None
-        cooldowns: Dict[Rank, int] = None
-        case_sensitive: bool = False
-        is_hidden: bool = False
-        is_enabled: bool = True
+    # Maybe consider using conventional __init__ and __slots__.
+    # Don't set the values that default to None,
+    # using setdefault() at instantiation by load_channel_builtin()!
+
+#    __slots__ = (
+#        'name', 'callback', 'channel_id', 'bot', 'aliases', 'global_aliases', 'perms', 'count', 'cooldowns', 'case_sensitive', 'syntax'
+#    )
+
+    _: dc.KW_ONLY
+    name: str
+    callback: Callable[[Context], None]
+    channel_id: int = None
+    bot = None # = None  # Necessary?
+    aliases: Iterable[str] = dc.field(default_factory=list)
+    global_aliases: Iterable[str] = ()
+    perms: str = None
+    count: int = None
+    cooldowns: Dict[Rank, int] = None
+    case_sensitive: bool = False
+    syntax: str = None
+    is_hidden: bool = False
+    is_enabled: bool = True
 
     async def __call__(self, context: Context) -> None:
+        # print(f"command {self.name} is running!")
         await self.invoke(context)
 
     async def invoke(self, context: Context) -> None:
-        if callable(self._callback):
-            await self._callback(context)
-            self._count += 1
+        try:
+            await self.callback(context)
+        except Exception as e:
+            print(f"Failed to process command {context.command!r} "
+                  f"of message {context.message.content!r} "
+                  f"in channel {context.channel.name}: "
+                  f"{e.args[0]}")
+        print(f"{self.name}.count = {self.count}")
+        # self.count += 1
+        # if callable(self._callback):
+            # await self._callback(context)
+
+    @property
+    def lc_aliases(self):
+        return {a.lower() for a in self._aliases}
+
+
 

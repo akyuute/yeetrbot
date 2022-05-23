@@ -1,0 +1,108 @@
+bot:
+
+  # The OAuth token and client ID for your bot's Twitch account.
+  # They can be obtained from https://twitchtokengenerator.com/
+  credentials:
+    token: oauth:
+    client_id: 
+    client_secret: 
+
+  # The list of channels to join before those registered in the database.
+  initial_channels:
+    - 
+
+  # Seconds to wait before responding to a duplicate (spammed) message.
+  # The default is 30.0.
+  # Code for handling the messages is still run and counts are incremented.
+  # (THIS MAY NOT BE TRUE ANYMORE.)
+  heartbeat: 30.0
+
+  # The name by which the bot should refer to itself.
+  display_name: 
+
+
+commands:
+
+  # The minimum permissions any chatter would need to use to commands.
+  # If channels_set_min_perms is enabled, this is only the default value.
+  # Choose one from the following: { everyone, vip, moderator, owner }
+  default_perms: everyone
+
+  # Let channels set their own minimum permissions and override default_perms.
+  channels_set_min_perms: true
+
+  # The initial count given to a command when it is created.
+  default_count: 0
+
+  # Global command name case sensitivity. E.g.: 'hi' and 'Hi' would be different
+  # commands in any channel when this is true.
+  # WARNING: If this is true when channels make commands with uppercase letters, if it
+  # changes to false, NONE of those commands will work until it is returned to true or
+  # the commands are manually renamed at runtime.
+  # Once a bot has had this set, it is best not to change it.
+  # CURRENTLY UNSUPPORTED
+  default_case_sensitive: false
+
+  # Let channels set their command name case sensitivity and override case_sensitive.
+  # A warning is shown before a channel changes its own case sensitivity.
+  channels_set_case: false
+
+  # Require a message to be set when a channel adds a new custom command.
+  # Setting this to true prevents the accidental creation of commands that
+  # appear to do nothing.
+  require_message: true
+
+  core_built_ins:
+
+    # The core built-in command that manages a channel's commands.
+    # It is equivalent to Nightbot's '!commands' command.
+    cmd_manage_commands:
+      name: "!cmd"
+      perms: "moderator"
+      aliases: 
+        -
+
+      # Similar to how '!addcom' is Nightbot's alias for '!commands add', these aliases
+      # refer to the actions for managing and configuring commands.
+      # If cmd_manage_commands.name is '!cmd' and cmd_manage_commands.action_aliases.add
+      # is '!addcmd', then '!addcmd' is an alias for `${cmd_manage_commands.name} add`.
+      action_aliases:
+        add: "!addcmd"
+        edit: "!editcmd"
+        delete: "!delcmd"
+        disable: "!disable"
+        enable: "!enable"
+        alias: "!alias"
+        show: "!showcmd"
+        syntax: "!syntax"
+
+    # The command used to register and join (start watching) a person's channel.
+    # Only available in the bot's own channel.
+    cmd_join:
+      name: "!join"
+      aliases:
+        -
+
+    # The command used to part (stop watching) a person's channel and purge their data.
+    # Only available in the bot's own channel.
+    cmd_part:
+      name: "!part"
+      aliases:
+        -
+
+    cmd_usernamechanged:
+      name: "!usernamechanged"
+      aliases:
+        -
+
+
+database:
+
+  # The file for the bot database.
+  file: "db/bot.db"
+
+
+logs:
+  # The directory for the bot's logs.
+  directory: "logs/"
+

@@ -3,6 +3,7 @@
 # from commands import CoreCommands
 # from optional_commands import OptionalCommands
 import commands
+import parse_commands
 from parsing import (cmd_add_parser, cmd_edit_parser,
     CMD_ARGUMENT_FLAGS)
 from errors import *
@@ -13,6 +14,7 @@ import re
 import sys
 import time
 import random
+import asyncio
 import sqlite3
 import inspect
 import itertools
@@ -23,43 +25,59 @@ from textwrap import dedent
 class Yeetrbot(Client):
     '''Contains methods for database exchanges and basic bot functionality.'''
 
-    def __init__(self, config: Config | dict):
-        self._db_file = config['DATABASE'].get('db_file', 'db/bot.db')
+    def __init__(self, config: str):
+
+        self.cfg = Config(config)
+        core_cmd_cfgs = self.cfg.commands['core_built_ins']
+        core_cmd_cfgs[
+                'cmd_manage_commands'][
+                    'fn_switch'] = {
+                        'add': parse_commands.add_command,
+                        'edit': parse_commands.edit_command,
+                        'delete': parse_commands.delete_command,
+                        'disable': parse_commands.toggle_command,
+                        'enable': parse_commands.toggle_command,
+                        #'alias': parse_command.edit_command
+                    }
+
+        for c in core_cmd_cfgs:
+            if core_cmd_cfgs[c].get('aliases'):
+                core_cmd_cfgs[c]['aliases'].remove('')
+
+        # self._db_file = config['DATABASE'].get('db_file', 'db/bot.db')
         self._channels = {}
-        self._built_in_commands = {}
-        self._built_in_aliases = {}
-        self.syntaxes = commands.CoreCommands.SYNTAXES.copy()
-        self.display_name = config['CREDENTIALS']['bot_nick']
+        # self.syntaxes = commands.CoreCommands.SYNTAXES.copy()
+        # self.display_name = config['CREDENTIALS']['bot_nick']
+        self.display_name = self.cfg.bot.get('display_name')
 
-        cmd_conf = config['COMMANDS']
+        # self._base_command_name = cmd_conf['base_command_name']
+        # self._default_perms = cmd_conf.get('default_perms', "everyone")
+        # self._default_count = int(cmd_conf.get('default_count', 0))
+        # self._default_cooldowns = cmd_conf.get("default_cooldowns")
+        # self._require_message = config.require_message
+        # self._override_builtins = config.override_builtins
+        # self._case_sensitive_commands = config.case_sensitive
 
-        #self._prefixes = cmd_conf.get('command_prefixes', "!").split()
-        #print("ChatBot prefixes:", self._prefixes)
-
-        self._base_command_name = cmd_conf['base_command_name']
-        self._default_perms = cmd_conf.get('default_perms', "everyone")
-        self._default_count = int(cmd_conf.get('default_count', 0))
-        self._default_cooldowns = cmd_conf.get("default_cooldowns")
-        self._require_message = config.require_message
-        self._override_builtins = config.override_builtins
-        self._case_sensitive_commands = config.case_sensitive
-
-        aliases = (a for a in cmd_conf.items() if '_command_alias' in a[0])
-        alias_dict = {k.removesuffix('_command_alias'): v for k, v in aliases}
-        self._base_command_aliases = alias_dict
-
-        initial_channels = config['CREDENTIALS']['initial_channels'].split()
+        initial_channels = self.cfg.bot.get('initial_channels')
         self._initial_channels = set(initial_channels + self.channels)
+        creds = self.cfg.bot['credentials']
 
         super().__init__(
-            token=config['CREDENTIALS']['access_token'],
-            client_secret=config['CREDENTIALS']['client_id'],
+            token=creds['token'],
+            client_secret=creds.get('client_secret') or creds.get('client_id'),
+            #client_id=creds['client_id'],
             initial_channels=self._initial_channels
             )
 
-        self._init_database(self._db_file)
-        self._init_channels()
+        # print(self.user_id)
+        self._built_in_commands = {}
+        self._built_in_command_aliases = {}
+        self._init_database(self.cfg.database['file'])
         self._init_builtins()
+        self._init_channels()
+
+        # self._built_in_lookup = {a.lower(): c for a, c in
+            # self._built_in_command_aliases.items()}
 
     @property
     def channels(self) -> list:
@@ -76,44 +94,94 @@ class Yeetrbot(Client):
     def _init_database(self, db_file: str):
         '''Connects to the sqlite3 database and creates it if necessary.'''
         self._db_conn = sqlite3.connect(db_file)
+        self._db_conn.row_factory = sqlite3.Row
         self._db = self._db_conn.cursor()
-        # with self._db_conn:
         with open('db/schema.sql', 'r') as f:
             self._db.executescript(f.read())
 
     def _init_channels(self):
         '''Retrieves channel records from the database and
         initializes a `RegisteredChannel` object for each.'''
+        # Initialize the bot's channel.
+        #await self.register_channel(self.user_id, self.display_name)
+
         records = self._db.execute("select * from channel")
         for record in records:
-            channel_id = record[0]
-            self._channels[channel_id] = RegisteredChannel(*record, bot=self)
+            #channel_id = record[0]
+            channel = RegisteredChannel(*record, bot=self)
+            # channel._alias_lookup.update(self._built_in_lookup)
+            # channel._alias_lookup = itertools.chain(
+                # channel.custom_command_aliases.items(),
+                # self._built_in_command_aliases.items()
+            # )
+            self._channels[channel.id] = channel
 
     def _init_builtins(self, cls = BuiltInCommand):
-        core_cmds = (
-            cls(name=f.__name__, func=f) for f in vars(commands.CoreCommands).values()
-            if callable(f))
-        opt_cmds = (c for _, c in inspect.getmembers(commands) if
-            isinstance(c, cls))
-        cust_cmds = (c for _, c in inspect.getmembers(self) if
-            isinstance(c, cls))
+        core_cfg = self.cfg.commands['core_built_ins']
+
+        core_cmds = []
+        for f in vars(commands.CoreCommands).values():
+            if not callable(f):
+                continue
+            # print(f"{f=}")
+            buin = core_cfg.get(f.__name__)
+            # print(f"{buin=}")
+            # buin['name'] = buin.get('name', f.__name__)
+            name = buin.get('name') or f.__name__
+            aliases = buin.get('aliases')
+            perms = buin.get('perms') or self.cfg.commands.get('default_perms')
+            count = buin.get('count') or self.cfg.commands.get('default_count')
+            # print(f"{count = !r}")
+
+            core_cmds.append(
+                # cls(**buin)
+                cls(
+                    name=name, callback=f, global_aliases=aliases, perms=perms, count=count
+                )
+            )
+
+        # core_cmds = (
+            # cls(
+                # name=core_cfg.get(f.__name__).get('name') or f.__name__,
+                # aliases=
+                # callback=f
+            # ) for f in
+            # vars(commands.CoreCommands).values() if callable(f))
+        opt_cmds = (c for _, c in
+            inspect.getmembers(commands) if isinstance(c, cls))
+        cust_cmds = (c for _, c in
+            inspect.getmembers(self) if isinstance(c, cls))
 
         cmds = itertools.chain(core_cmds, opt_cmds, cust_cmds)
 
         # print("Length of chain of cmds:", len(list(cmds)))
         for cmd in cmds:
-            # print("Hellp?")
+            # print(cmd)
             self.load_builtin(cmd)
-            print(cmd.name)
+            print("Loaded built-in:", cmd.name)
 
-        print(self._built_in_aliases)
+        # print(self._built_in_command_aliases)
 
-        _sql = "select * from channel_built_in"
+        # self._db.row_factory = sqlite3.Row
+        _sql = """
+        select * from built_in_command l inner join
+        channel_built_in_data r on l.id = r.command_id"""
         records = self._db.execute(_sql)
         for record in records:
-            channel_id = record[0]
-            command = dict(record)
-            print("Built-in:", command)
+            data = dict(**record)
+            data.pop('id')
+            # data_dict = {k: v for k, v in dict(record).items()
+                # if k != 'id' and v is not None}
+            try:
+                fn = self._built_in_command_aliases.get(data['name']).callback
+            except KeyError as e:
+                print(f"Built-in command {data['name']!r} does not exist.")
+            except AttributeError as e:
+                print(f"Built-in command {data['name']!r} has no callback.")
+            channel_id = data['channel_id']
+            command = BuiltInCommand(**data, bot=self, callback=fn)
+            self._channels[channel_id] = command
+            # print("Built-in:", command)
 
     def load_builtin(self, command) -> None:
         '''Load a built-in command for use globally.'''
@@ -126,28 +194,62 @@ class Yeetrbot(Client):
         elif command.name in self._built_in_commands:
             raise NameConflict(error_preface +
                 f"A built-in command with this name is already loaded.")
-        elif not inspect.iscoroutinefunction(command._callback):
+        elif not inspect.iscoroutinefunction(command.callback):
             raise RegistrationError(error_preface +
                 f"Command callbacks must be coroutines.")
 
-        command._instance = self
-        self._built_in_aliases[command.name] = command
+        # print(f"{command = }")
+        # print(f"{self._built_in_command_aliases = }")
 
-        _sql = "insert into built_in_command(name, global_aliases) values (?,?)"
-        values = (command.name, ','.join(command._aliases))
+        # command.bot = self
+        self._built_in_command_aliases[command.name] = command
+
+        # _sql = """
+            # INSERT OR UPDATE INTO
+        _sql = """INSERT OR IGNORE INTO
+            built_in_command(name, global_aliases)
+            VALUES (?,?)"""
+        values = (command.name, ','.join(command.global_aliases or ""))
         self._db.execute(_sql, values)
         self._db_conn.commit()
 
-        if not command._aliases:
+        if not command.aliases:
             return
-        for alias in command._aliases:
-            if alias in self._built_in_aliases:
+        for alias in command.aliases:
+            if alias in self._built_in_command_aliases:
                 # self._built_in_commands.pop(command.name)
                 raise NameConflict(error_preface +
                     f"A built-in command with the same name or alias is "
                     f"already loaded.")
-            self._built_in_aliases[alias] = command
+            self._built_in_command_aliases[alias] = command
 
+    
+        _sql = """
+            select * from built_in_command l
+            left join channel_built_in_data r
+            on l.id = r.command_id"""
+        records = self._db.execute(_sql)
+        for row in records:
+            print(dict(**row))
+        # print(dict(**row for row in records))
+
+
+    def load_channel_builtin(self, channel_id: int, command):
+        cfg = self.cfg.commands
+        attrs = {
+             'channel_id': channel_id,
+             'perms': cfg.default_perms,
+             'count': cfg.default_count,
+        }
+
+        for attr, default in attrs.items():
+            if getattr(command, attr) is None:
+                setattr(command, attr, default)
+
+        # if command.count is None:
+            # command.count = cfg['default_count']
+            # command.count = cfg['default_count']
+        self._channels[channel_id]._command_aliases[command.name] = command
 
     def _init_commands(self):
         '''Retrieves command records from the database and
@@ -162,27 +264,40 @@ class Yeetrbot(Client):
             cmd = CustomCommand(*record)
             self._channels[cmd.channel_id].commands[cmd.name] = cmd
 
- 
-    def register_channel(self, uid: int, name: str):
+    async def register_channel(self, uid: int, name: str):
         '''Registers a channel to the database if new, otherwise raises
         `RegistrationError`. This must only be called by a command sent
         in the bot's channel.'''
-        if uid in self._channels:
+
+        if int(uid) in self._channels:
             error = f"Channel {name!r} is already registered."
-            raise RegistrationError(error)
-        channel = RegisteredChannel(uid, name)
-        self._channels[uid] = channel
-        fields = ('id', 'name')
-        values = (uid, name)
+            # raise RegistrationError(error)
+            print(error)
+            return
+
+        print("Registering:", uid, name)
+        channel = RegisteredChannel(uid, name, bot=self)
+        self._channels[channel.id] = channel
+        fields = ('id', 'name', 'join_date')
+        values = (channel.id, channel.name, channel.join_date)
         # opt = ""
         opt = "or replace"
-        _sql = f"insert {opt} into channel({','.join(fields)}) values (?,?)"
+        _sql = f"insert {opt} into channel({','.join(fields)}) values (?,?,?)"
         try:
             self._db.execute(_sql, values)
         except sqlite3.Error as exc:
             self._channels.pop(uid)
             raise DatabaseError(exc.args[0])
 
+    async def register_initial_channels(self):
+        # assert hasattr(self, '_initial_channels')
+        # Register the bot:
+        await self.register_channel(self.user_id, self.display_name.lower())
+        for channel in self.connected_channels:
+            chan = await channel.user()
+            await self.register_channel(chan.id, channel.name)
+            print(self._channels)
+ 
     def refresh_user_data(self, user_id: int, name: str):
         '''Updates a channel's name if the username changes.'''
         fields = ('id', 'name')
@@ -204,14 +319,7 @@ class Yeetrbot(Client):
 
         alias_switch = self._base_command_aliases
         actions = alias_switch.keys()
-        func_switch = {
-            'add': self._add_command,
-            'edit': self._edit_command,
-            'delete': self._delete_command,
-            'disable': self._toggle_command,
-            'enable': self._toggle_command,
-            'alias': self._edit_command
-        }
+
         #prefixless = ctx.cmd.removeprefix(ctx.prefix)
         #prefix_base = ctx.prefix + self._base_command_name
         cmd_name = ctx.command.name
@@ -579,45 +687,134 @@ class Yeetrbot(Client):
             raise ValueError("No arguments in list")
         return ' '.join(syntax.get(m, "") for m in set(args))
 
+    async def resolve_long_alias(self, context: Context) -> tuple[CustomCommand|BuiltInCommand, str]:
+        channel = context.channel
+        content = context.message.content.lower()
+        # print(content)
+        # print(channel._alias_lookup.items())
+        # for item in channel._alias_lookup.items():
+        # cmds = channel.custom_command_aliases.items()
+        # bins = channel.built_in_aliases.items()
+        # default = self._built_in_command_aliases.items()
+        # lookup = itertools.chain(cmds, bins, default)
+        # # lookup = channel.custom_command_aliases
+        lookup = channel._alias_lookup
+        if lookup:
+            # for alias, cmd in lookup.items():
+            for alias, cmd in lookup:
+                # print(f"{alias=}")
+                # print(f"{cmd=}")
+                if content.startswith(alias):
+                    return alias, cmd
+        return (None, None)
+
+        # for alias, cmd in channel._alias_lookup.items():
+            # print("alias:", alias)
+            # print("cmd:", cmd)
+            # if message.lower().startswith(alias):
+                # return item
+                # return cmd, alias
+
+
     async def get_command(self, context: Context) -> CustomCommand|BuiltInCommand:
-        channel = self._channels[context.channel_id]
-        command_or_alias = context.message.content.partition(" ")[0]
-        if self._case_sensitive_commands:
-            command_name = command_or_alias 
+        channel = context.channel
+        command_name = context.message.content.partition(" ")[0]
+        ci_name = command_name.lower()
+        command = (channel.custom_command_aliases.get(ci_name) or
+                   channel.built_in_aliases.get(ci_name))
+
+        if command is None:
+            alias, command = await self.resolve_long_alias(context)
+            # match = await self.resolve_long_alias(context)
+            # if match is not None:
+                # alias, command = match
+            # return
+            context.invoked_with = alias
+
+            if command is None:
+                context.invoked_with = None
+                # context.is_valid = False  # Only useful for commands, not keywords.
+                return
+
         else:
-            command_name = command_or_alias.lower()
+            context.invoked_with = command_name
 
-        if command_name in channel._command_aliases:
-            #command = channel._commands[channel._command_aliases[command_name]]
-            command = chann
-        elif command_name in channel._built_in_aliases:
-            command = channel._built_ins.get(command_name)
-        #elif command_name in self._built_in_aliases:
+        bot_allows_cs = self.cfg.commands['channels_set_case']
+        bot_default_cs = self.cfg.commands['default_case_sensitive']
+        # channel_cs = channel.case_sensitive
+        command_cs = command.case_sensitive
 
-        return channel._command_aliases.get(command_, None)
+        if bot_allows_cs:
+            # if not (channel_cs or command_cs):
+            if not command_cs:
+                return command
+        if not bot_default_cs:
+            return command
+
+        command = (channel._command_aliases.get(command_name) or
+                   channel._built_in_aliases.get(command_name))
+        return command
+
+
+    #async def get_command(self, context: Context) -> CustomCommand|BuiltInCommand:
+    #    channel = self._channels[context.channel.id]
+    #    command_name = context.message.content.partition(" ")[0].lower()
+
+    #    command = (channel.command_aliases.get(command_name) or
+    #               channel.built_in_aliases.get(command_name))
+    #    if command is None:
+
+    #    if (channel.case_sensitive and channels_set_case) or bot_case_sensitive
+    #    channel.aliasesandb.get(command_name)
+    #        #  if the command is case-sensitive:
+    #        #  which command?
+    #    # if channel.case_sensitive:
+    #        # command_name = command_or_alias 
+    #    # else:
+    #        # command_name = command_or_alias.lower()
+
+    #    command = None
+    #    if command_name in channel._command_aliases:
+    #        #command = channel._commands[channel._command_aliases[command_name]]
+    #        command = channel._command_aliases.get(command_name, None)
+    #    elif command_name in channel._built_in_command_aliases:
+    #        command = channel._built_ins.get(command_name, None)
+    #    #elif command_name in self._built_in_command_aliases:
+
+    #    return command
+
+    async def get_built_in(self, name: str):
+        command = self._built_in_command_aliases.get(name, None)
 
     async def get_context(self, message: Message) -> Context:
         '''Returns a `Context` object made from a `Message` returned by
         `event_message` after setting its attributes.'''
         context = Context(bot=self, message=message)
-        context.prefix = "!"  # Remove after fixing cmd management
-        command_name = context.message.content.partition(" ")[0]
-        command = await context.channel.resolve_command(command_name)
-        if command is None:
-            # print("No command found in channel commands. Searching bot built-ins...")
-            for alias, cmd in self._built_in_aliases.items():
-                if context.message.content.startswith(alias):
-                    context.command = cmd
-                    context.invoked_with = alias
-                    print("Found command:", cmd.name)
         return context
 
     async def handle_commands(self, context: Context):
-        # if context._command_name in self._built_in_aliases:
+        # print(vars(context))
+        context.prefix = "!"  # Remove after fixing cmd management
+
+        content = context.message.content
+        # command_name = content.partition(" ")[0]
+        # command = await context.channel.resolve_command(command_name)
+        alias = None
+        # cmds_and_built_ins = zip(channel._command_aliases, self._built_in_command_aliases.items():
+        command = await self.get_command(context)
+
+        if command is not None:
+            context.command = command
+
+        context.msg_body = content.removeprefix(context.invoked_with) if (
+            context.invoked_with is not None) else content
+        # if context._command_name in self._built_in_command_aliases:
             # return await self.built_in_commands[context.command](context)
+        print(f"{context.command = }")
         if context.command is not None : #  or context.is_valid is not False:
-            return await context.command(context)
-        await self.handle_keywords(context)
+            await context.command(context)
+            print("Command should have run.")
+            return 1
 
 
     async def handle_keywords(self, context: Context):
@@ -627,8 +824,14 @@ class Yeetrbot(Client):
 
     async def event_ready(self):
         '''Have the bot do things upon connection to the Twitch server.'''
+        print(self.user_id)
         print(f"{self.display_name} is online!")
         print("Connected channels:", self.connected_channels)
+
+        await self.register_initial_channels()
+        print("Registered initial channels.")
+        print(self._channels)
+
         # Post a message in each registered channel's chat upon connection:
         # for channel in self.connected_channels:
         # notify = f"{self.display_name} is online!"
@@ -638,15 +841,15 @@ class Yeetrbot(Client):
     async def event_message(self, message: Message):
         if message.echo:
             return
+        # print(self._channels)
         #print(message.raw_data)
+        # self.MESSAGE = message
+        context = await self.get_context(message)
+        self.CTX = context
         # print(f"{context.channel.name} -> {context.message.content}")
         print(f"{context.author.name} -> {context.message.content}")
-        context = await self.get_context(message)
         # print(context.channel._command_aliases)
-        await self.handle_commands(context)
-
-
-if __name__ == '__main__':
-    pass
-    # bot = Yeetrbot(config=Config('bot.conf'))
+        command_ran = await self.handle_commands(context)
+        if command_ran is not True:
+            await self.handle_keywords(context)
 

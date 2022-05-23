@@ -1,3 +1,7 @@
+import random
+from typing import Any, Union, Callable
+
+
 def split_nth(it, n: int):
     if not hasattr(it, '__iter__'):
         raise TypeError(f"Can only split an iterable, not {type(it)}.")
@@ -26,4 +30,60 @@ def get_rand_index(max_size: int, previous_val: int,
     while min_size <= index == previous_val and repeat_prob < random.random():
         index = int(random.random() * max_size)
     return index
+
+def comb(
+    obj: Union[list, dict],
+    # func: Callable[Any],
+    pred: Callable[Any, bool]) -> dict:
+    '''Recurses through a dict or list, executing `func(dct[k])` whenever predicate
+    `pred(obj[k])` returns True. Returns obj at the end.'''
+    if isinstance(obj, list):
+        return "Hmm."
+
+    elif isinstance(obj, dict):
+        for k in tuple(obj.keys()):
+            # try:
+            if pred(obj[k]):
+                obj.pop(k)
+                # func(obj[k])
+            # except Exception:
+                # comb(obj[k], pred)
+                # pass
+            else:
+                comb(obj[k], pred)
+                return obj
+
+    # else:
+        # print(obj)
+        # raise TypeError("Bad type...")
+    return obj
+
+
+def remove_from_keys(
+    obj: Union[list, dict],
+    # func: Callable[Any],
+    pred: Callable[Any, bool]) -> dict:
+    '''Recurses through a dict or list, executing `func(dct[k])` whenever predicate
+    `pred(obj[k])` returns True. Returns obj at the end.'''
+    if isinstance(obj, list):
+        return "Hmm."
+
+    elif isinstance(obj, dict):
+        for k in tuple(obj.keys()):
+            # try:
+            #if pred(obj[k]):
+            if pred(k):
+                obj.pop(k)
+                # func(obj[k])
+            # except Exception:
+                # comb(obj[k], pred)
+                # pass
+            else:
+                remove_from_keys(obj[k], pred)
+                # return obj
+
+    # else:
+        # print(obj)
+        # raise TypeError("Bad type...")
+    return obj
 

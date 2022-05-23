@@ -12,6 +12,8 @@ create table if not exists channel (
     id integer primary key
     , name text unique not null
     , join_date int not null
+    , command_prefix text
+    , min_perms text
 );
 
 create table if not exists user_presence (
@@ -36,20 +38,20 @@ create table if not exists custom_variable (
 
 create table if not exists built_in_command (
     id integer primary key
-    , name text not null
+    , name text unique not null
     , global_aliases text
 );
 
-create table if not exists channel_built_in (
-    channel_id integer not null
-    , command_id integer not null
+create table if not exists channel_built_in_data (
+    command_id integer not null
+    , channel_id integer not null
     , aliases text
     , perms text not null
     , count integer
-    , cooldowns text -- e.g.: "10,5,0,'Weebs':30" for (Everyone,VIP,Moderator,<Rank(name='Weebs')>)
+    , cooldowns json -- e.g.: "10,5,0,'Weebs':30" for (Everyone,VIP,Moderator,<Rank(name='Weebs')>)
     , is_enabled integer not null
     , is_hidden integer not null
-    , primary key (channel_id, command_id)
+    , primary key (command_id, channel_id)
     , foreign key (command_id) references built_in_command(id)
     , foreign key (channel_id) references channel(id)
 );
