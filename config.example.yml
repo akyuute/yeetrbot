@@ -13,9 +13,10 @@ bot:
 
   # Seconds to wait before responding to a duplicate (spammed) message.
   # The default is 30.0.
-  # Code for handling the messages is still run and counts are incremented.
-  # (THIS MAY NOT BE TRUE ANYMORE.)
-  heartbeat: 30.0
+  # NOTE: Code for handling the messages is still run and counts are incremented. This
+  # may no longer be the case.
+  # Default: 3.0 for debugging, 30.0 from TwitchIO
+  heartbeat: 3
 
   # The name by which the bot should refer to itself.
   display_name: 
@@ -23,25 +24,8 @@ bot:
 
 commands:
 
-  # The minimum permissions any chatter would need to use to commands.
-  # If channels_set_min_perms is enabled, this is only the default value.
-  # Choose one from the following: { everyone, vip, moderator, owner }
-  default_perms: everyone
-
   # Let channels set their own minimum permissions and override default_perms.
   channels_set_min_perms: true
-
-  # The initial count given to a command when it is created.
-  default_count: 0
-
-  # Global command name case sensitivity. E.g.: 'hi' and 'Hi' would be different
-  # commands in any channel when this is true.
-  # WARNING: If this is true when channels make commands with uppercase letters, if it
-  # changes to false, NONE of those commands will work until it is returned to true or
-  # the commands are manually renamed at runtime.
-  # Once a bot has had this set, it is best not to change it.
-  # CURRENTLY UNSUPPORTED
-  default_case_sensitive: false
 
   # Let channels set their command name case sensitivity and override case_sensitive.
   # A warning is shown before a channel changes its own case sensitivity.
@@ -51,6 +35,43 @@ commands:
   # Setting this to true prevents the accidental creation of commands that
   # appear to do nothing.
   require_message: true
+
+  # These defaults determine how and under what circumstances custom channel commands
+  # are created and modified.
+  defaults:
+
+    # The minimum permissions any chatter would need to use to commands.
+    # If channels_set_min_perms is enabled, this is only the default value.
+    # Choose one from the following: { everyone, vip, moderator, owner }
+    perms: everyone
+
+    # The initial integer count given to a command when it is created.
+    count: 0
+
+    # User cooldown lengths
+    # NOTE: Not yet implemented; global cooldowns to come.
+    cooldowns:
+      everyone: 5.0  # Default: 5.0
+      vip: 1.0  # Default: 1.0
+      moderator: 1.0  # Default: 1.0
+      owner: 1.0  # Default: 1.0
+
+    # When true, this hides any new command's name from !showcmd and !syntax results
+    # until and unless they are manually unhidden.
+    is_hidden: false
+
+    # When false, people in chat are unable to use new commands until and unless they
+    # are manually enabled.
+    is_enabled: true
+
+    # Global command name case sensitivity. E.g.: 'hi' and 'Hi' would be different
+    # commands in any channel when this is true.
+    # WARNING: If this is true when channels make commands with uppercase letters, if it
+    # changes to false, NONE of those commands will work until it is returned to true or
+    # the commands are manually renamed at runtime.
+    # Once a bot has had this set, it is best not to change it.
+    # NOTE: Currently unsupported.
+    case_sensitive: false
 
   core_built_ins:
 

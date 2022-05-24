@@ -28,19 +28,29 @@ class Config:
         self.bot['heartbeat'] = float(self.bot.get('heartbeat', 30))
 
         cmds = self.commands
-        default_perms = cmds.get('default_perms', "everyone")
+        dfts = cmds['defaults']
+
         channels_set_min_perms = cmds.get('channels_set_min_perms', "t")
-        default_count = cmds.get('default_count', 0)
-        case_sensitive = cmds.get('case_sensitive', "f")
         channels_set_case = cmds.get('channels_set_case', "f")
         require_message = cmds.get('require_message', "t")
 
-        cmds['default_perms'] = default_perms
         cmds['channels_set_min_perms'] = str_to_bool(channels_set_min_perms)
-        cmds['default_count'] = int(default_count)
-        cmds['case_sensitive'] = str_to_bool(case_sensitive)
         cmds['chnls_set_case'] = str_to_bool(channels_set_case)
         cmds['require_message'] = str_to_bool(require_message)
+        dfts['perms'] = dfts.get('default_perms', "everyone")
+        dfts['count'] = int(dfts.get('default_count', 0))
+        dfts['case_sensitive'] = str_to_bool(dfts.get('case_sensitive', "f"))
+
+        default_cd = dfts.get('cooldowns', None)
+        if default_cd is None:
+            ranks = "everyone vip moderator owner".split()
+            default_cd = dict.fromkeys(ranks, 1.0)
+        dfts['cooldowns'] = {rk: float(cd) for rk, cd in default_cd.items()}
+
+        # Use setdefault() here??
+        # dfts['perms'] = default_perms
+        # dfts['count'] = int(default_count)
+        # dfts['case_sensitive'] = str_to_bool(default_case_sensitive)
         #cmds['core_built_ins']['manage_commands']['func_switch'] = {
         #    'add': parse_commands.add_command,
         #    'edit': parse_commands.edit_command,

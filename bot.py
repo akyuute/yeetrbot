@@ -9,7 +9,7 @@ from parsing import (cmd_add_parser, cmd_edit_parser,
 from errors import *
 from twitchio import Client, Message
 from base_classes import Config, RegisteredChannel, Context, CustomCommand, BuiltInCommand
-from parse_commands_new import ManageCmdParser
+# from parse_commands import ManageCmdParser
 
 import re
 import sys
@@ -30,22 +30,23 @@ class Yeetrbot(Client):
 
         self.cfg = Config(config)
         core_cmd_cfgs = self.cfg.commands['core_built_ins']
-        core_cmd_cfgs[
-                'cmd_manage_commands'][
-                    'fn_switch'] = {
-                        'add': parse_commands.add_command,
-                        'edit': parse_commands.edit_command,
-                        'delete': parse_commands.delete_command,
-                        'disable': parse_commands.toggle_command,
-                        'enable': parse_commands.toggle_command,
-                        #'alias': parse_command.edit_command
-                    }
 
         for c in core_cmd_cfgs:
             if core_cmd_cfgs[c].get('aliases'):
                 core_cmd_cfgs[c]['aliases'].remove('')
 
-        self.cmd_manager = ManageCmdParser(self, self.cfg.commands)
+        self.cmd_manager = parse_commands.ManageCmdParser(self)
+        core_cmd_cfgs[
+                'cmd_manage_commands'][
+                    'fn_switch'] = {
+                        'add': self.cmd_manager.add_command,
+                        'edit': self.cmd_manager.edit_command,
+                        'delete': self.cmd_manager.delete_command,
+                        'disable': self.cmd_manager.toggle_command,
+                        'enable': self.cmd_manager.toggle_command,
+                        #'alias': self.cmd_manager.edit_command
+                    }
+
         # self._db_file = config['DATABASE'].get('db_file', 'db/bot.db')
         self._channels = {}
         # self.syntaxes = commands.CoreCommands.SYNTAXES.copy()
@@ -742,7 +743,7 @@ class Yeetrbot(Client):
             context.invoked_with = command_name
 
         bot_allows_cs = self.cfg.commands['channels_set_case']
-        bot_default_cs = self.cfg.commands['default_case_sensitive']
+        bot_default_cs = self.cfg.commands['defaults']['case_sensitive']
         # channel_cs = channel.case_sensitive
         command_cs = command.case_sensitive
 

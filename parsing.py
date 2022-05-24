@@ -1,8 +1,10 @@
 '''Functions for parsing config files, values and command strings.'''
 
-import argparse
 from utils import split_nth, join_with_or
 from errors import ParsingError, InvalidArgument
+
+import argparse
+from textwrap import dedent
 
 
 CMD_ARGUMENT_FLAGS = (
@@ -52,9 +54,10 @@ class GroupByDelimiter(argparse.Action):
         try:
             self.delimiters = kwargs.pop('delimiters')
         except KeyError:
-            error = (f"Argument {option_strings[0]!r} needs 'delimiters' "
-                     f"parameter with action={self.__class__.__name__}.")
-            raise ValueError(error)
+            error = f"""
+                Argument {option_strings[0]!r} needs 'delimiters' parameter
+                with action={self.__class__.__name__}."""
+            raise ValueError(dedent(error))
         super().__init__(option_strings, dest, nargs=nargs, **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
@@ -67,15 +70,12 @@ class GroupByDelimiter(argparse.Action):
             i = self.delimiters.index(argstr[0])
         except ValueError:
             delim_opts = join_with_or(tuple(split_nth(self.delimiters, 2)))
-            e = (f"The {self.slash_names!r} argument must be escaped with "
-                 f"{delim_opts} when it is longer than one word or followed "
-                 f"by other arguments.")
-            e = " ".join(line.strip() for line in f"""
+            error = f"""
                 The {self.slash_names!r} argument must be escaped with
                 {delim_opts} when it is longer than one word or followed by
-                other arguments.""".splitlines())
+                other arguments."""
             # raise InvalidArgument(" ".join(line.strip() for line in e.splitlines()))
-            raise InvalidArgument(e)
+            raise InvalidArgument(dedent(error))
 
         start, end = self.delimiters[i:][:2]
         if start == end:  # For delimiters that are quotes
@@ -92,9 +92,12 @@ class GroupByDelimiter(argparse.Action):
 cmd_add_or_edit = QuietParser(prog='!cmd',
     add_help=False)
 cmd_add_or_edit.set_defaults(
-    default=None,
-    is_enabled=None,
-    is_hidden=None,
+    # default=None,
+    # default=argparse.SUPPRESS,
+    # is_enabled=argparse.SUPPRESS,
+    # is_hidden=argparse.SUPPRESS,
+    # is_enabled=None,
+    # is_hidden=None,
     )
 
 cmd_add_or_edit.add_argument('--help', '-h',
@@ -103,40 +106,55 @@ cmd_add_or_edit.add_argument('--help', '-h',
 
 cmd_add_or_edit.add_argument('--perms', '-p',
     choices="everyone vip moderator owner rank=".split(),
+    default=argparse.SUPPRESS,
     type=lambda s: s.lower())
 
-cmd_add_or_edit.add_argument('--aliases', '-a', nargs=1)
-cmd_add_or_edit.add_argument('--count', '-c', type=int)
+cmd_add_or_edit.add_argument('--aliases', '-a', nargs=1,
+    default=argparse.SUPPRESS,
+    )
+
+cmd_add_or_edit.add_argument('--count', '-c', type=int,
+    default=argparse.SUPPRESS,
+    )
 
 cmd_add_or_edit.add_argument('--case-sensitive', '-I',
+    default=argparse.SUPPRESS,
     )
 
 cmd_add_or_edit.add_argument('--disable', '-d',
+    default=argparse.SUPPRESS,
     action='store_false',
     dest='is_enabled')
 
 cmd_add_or_edit.add_argument('--enable', '-e',
+    default=argparse.SUPPRESS,
     action='store_true',
     dest='is_enabled')
 
 cmd_add_or_edit.add_argument('--hide',
+    default=argparse.SUPPRESS,
     action='store_true',
     dest='is_hidden')
 
 cmd_add_or_edit.add_argument('--unhide',
+    default=argparse.SUPPRESS,
     action='store_false',
     dest='is_hidden')
 
 cmd_add_or_edit.add_argument('--expire', '-x',
+    default=argparse.SUPPRESS,
     action=GroupByDelimiter,
     delimiters=GROUP_DELIMITERS)
 
 # cmd_add_or_edit.add_argument('--expire-at',
+    # default=argparse.SUPPRESS,
     # action=GroupByDelimiter,
     # delimiters=GROUP_DELIMITERS)
 
 # cmd_add_or_edit.add_argument('--override_builtin', action='store_true')
-cmd_add_or_edit.add_argument('message', nargs=argparse.REMAINDER)
+cmd_add_or_edit.add_argument('message', nargs=argparse.REMAINDER,
+    default=argparse.SUPPRESS,
+    )
 
 cmd_add_parser = QuietParser('add', parents=[cmd_add_or_edit],
     description="Add a new custom command.",
@@ -147,5 +165,8 @@ cmd_edit_parser = QuietParser('edit', parents=[cmd_add_or_edit],
     description="Edit a custom command's message and properties.",
     add_help=False
     )
-cmd_edit_parser.add_argument('--rename', '-r', nargs=1, dest='new_name')
+cmd_edit_parser.add_argument('--rename', '-r', nargs=1, dest='new_name',
+    default=argparse.SUPPRESS,
+    )
+
 
