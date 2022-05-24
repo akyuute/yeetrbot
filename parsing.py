@@ -91,7 +91,11 @@ class GroupByDelimiter(argparse.Action):
 
 cmd_add_or_edit = QuietParser(prog='!cmd',
     add_help=False)
-cmd_add_or_edit.set_defaults(default=None)
+cmd_add_or_edit.set_defaults(
+    default=None,
+    is_enabled=None,
+    is_hidden=None,
+    )
 
 cmd_add_or_edit.add_argument('--help', '-h',
         action='store_true',

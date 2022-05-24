@@ -273,12 +273,13 @@ class BuiltInCommand:
     async def invoke(self, context: Context) -> None:
         try:
             await self.callback(context)
-        except Exception as e:
-            print(f"Failed to process command {context.command!r} "
-                  f"of message {context.message.content!r} "
-                  f"in channel {context.channel.name}: "
-                  f"{e.args[0]}")
-        print(f"{self.name}.count = {self.count}")
+        finally: pass
+##        except Exception as e:
+##            print(f"Failed to process command {context.command!r} "
+##                  f"of message {context.message.content!r} "
+##                  f"in channel {context.channel.name}: "
+##                  f"{e.args[0]}")
+##        print(f"{self.name}.count = {self.count}")
         # self.count += 1
         # if callable(self._callback):
             # await self._callback(context)

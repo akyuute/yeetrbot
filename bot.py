@@ -9,6 +9,7 @@ from parsing import (cmd_add_parser, cmd_edit_parser,
 from errors import *
 from twitchio import Client, Message
 from base_classes import Config, RegisteredChannel, Context, CustomCommand, BuiltInCommand
+from parse_commands_new import ManageCmdParser
 
 import re
 import sys
@@ -44,6 +45,7 @@ class Yeetrbot(Client):
             if core_cmd_cfgs[c].get('aliases'):
                 core_cmd_cfgs[c]['aliases'].remove('')
 
+        self.cmd_manager = ManageCmdParser(self, self.cfg.commands)
         # self._db_file = config['DATABASE'].get('db_file', 'db/bot.db')
         self._channels = {}
         # self.syntaxes = commands.CoreCommands.SYNTAXES.copy()
@@ -806,14 +808,16 @@ class Yeetrbot(Client):
         if command is not None:
             context.command = command
 
-        context.msg_body = content.removeprefix(context.invoked_with) if (
-            context.invoked_with is not None) else content
+        context.msg_body = content.removeprefix(context.invoked_with).strip() if (
+            context.invoked_with is not None) else content.strip()
         # if context._command_name in self._built_in_command_aliases:
             # return await self.built_in_commands[context.command](context)
-        print(f"{context.command = }")
+        # print(f"{context.command = }")
+        print(f"{context.invoked_with = }")
+        print(f"{context.msg_body = }")
         if context.command is not None : #  or context.is_valid is not False:
             await context.command(context)
-            print("Command should have run.")
+            print(f"Command {context.command!r} should have run.")
             return 1
 
 
@@ -846,6 +850,9 @@ class Yeetrbot(Client):
         # self.MESSAGE = message
         context = await self.get_context(message)
         self.CTX = context
+        # import pickle
+        # with open('bot.pkl', 'w') as f:
+            # pickle.dump(self, f)
         # print(f"{context.channel.name} -> {context.message.content}")
         print(f"{context.author.name} -> {context.message.content}")
         # print(context.channel._command_aliases)

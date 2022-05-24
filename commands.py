@@ -1,6 +1,7 @@
 from base_classes import Context, Rank, CustomCommand, BuiltInCommand
 from utils import get_rand_index
 import command_funcs
+from errors import *
 # from commands import register_built_in
 # from core_commands import built_in
 
@@ -68,7 +69,7 @@ class CoreCommands:
     }
 
     # @register_built_in(name=P+'cmd', aliases=(P+'addcmd', ))
-    async def cmd_manage_commands(bot, ctx: Context):
+    async def cmd_manage_commands(ctx: Context):
     # async def command_cmd(bot, ctx: Context):
         resp = ""
         if not ctx.author.is_mod:
@@ -78,7 +79,8 @@ class CoreCommands:
         # if channel.users[auth_id].rank not in cmd_perms:
             # await ctx.send(f"{ctx.author.mention}: ")
         try:
-            resp = bot._manage_custom_command(ctx)
+            # resp = bot._manage_custom_command(ctx)
+            resp = ctx.bot.cmd_manager.manage_commands(ctx)
 
         except ChannelNotFoundError as exc:
             resp = exc.args[0]
@@ -100,7 +102,7 @@ class CoreCommands:
         await ctx.send(f"{ctx.author.mention}: {resp}")
 
     # @register_built_in(name=P+'join')
-    async def cmd_join(bot, ctx: Context):
+    async def cmd_join(ctx: Context):
         '''Registers a new channel to the database when invoked within
         the bot's Twitch channel and sends a response.'''
         if ctx.channel.id != bot.user_id:
