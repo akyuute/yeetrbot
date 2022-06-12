@@ -110,7 +110,7 @@ class Yeetrbot(Client):
 
         records = self._db.execute("select * from channel")
         for record in records:
-            #channel_id = record[0]
+            # print(f"{dict(record) = }")
             channel = RegisteredChannel(*record, bot=self)
             # channel._alias_lookup.update(self._built_in_lookup)
             # channel._alias_lookup = itertools.chain(
@@ -835,12 +835,14 @@ class Yeetrbot(Client):
             context.invoked_with is not None) else content.strip()
         # if context._command_name in self._built_in_command_aliases:
             # return await self.built_in_commands[context.command](context)
+
         # print(f"{context.command = }")
-        print(f"{context.invoked_with = }")
-        print(f"{context.msg_body = }")
+        # print(f"{context.invoked_with = }")
+        # print(f"{context.msg_body = }")
+
         if context.command is not None : #  or context.is_valid is not False:
             await context.command(context)
-            print(f"Command {context.command!r} should have run.")
+            # print(f"Command {context.command!r} should have run.")
             return 1
 
 

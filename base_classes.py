@@ -39,13 +39,16 @@ class Config:
         cmds['require_message'] = str_to_bool(require_message)
         dfts['perms'] = dfts.get('default_perms', "everyone")
         dfts['count'] = int(dfts.get('default_count', 0))
+        dfts['is_enabled'] = str_to_bool(dfts.get('is_enabled', "t"))
+        dfts['is_hidden'] = str_to_bool(dfts.get('is_hidden', "f"))
         dfts['case_sensitive'] = str_to_bool(dfts.get('case_sensitive', "f"))
 
         default_cd = dfts.get('cooldowns', None)
+        base_ranks = "everyone vip moderator owner".split()
         if default_cd is None:
-            ranks = "everyone vip moderator owner".split()
-            default_cd = dict.fromkeys(ranks, 1.0)
-        dfts['cooldowns'] = {rk: float(cd) for rk, cd in default_cd.items()}
+            default_cd = dict.fromkeys(base_ranks, 1.0)
+        # dfts['cooldowns'] = {rk: float(cd) for rk, cd in default_cd.items()}
+        dfts['cooldowns'] = [default_cd[rk] for rk in base_ranks]
 
         # Use setdefault() here??
         # dfts['perms'] = default_perms
@@ -71,6 +74,7 @@ class RegisteredChannel(twitchio.Channel):
         'id',
         'name',
         'join_date',
+        'min_perms',
         'case_sensitive_commands',
         '_command_aliases',
         '_keyword_aliases',
@@ -80,7 +84,14 @@ class RegisteredChannel(twitchio.Channel):
         '_ws',
         )
 
-    def __init__(self, uid: int, name: str, join_date: int = None, bot=None):
+    def __init__(
+        self,
+        uid: int,
+        name: str,
+        join_date: int = None,
+        min_perms: str = None,
+        bot=None
+        ):
         if bot is not None:
             super().__init__(name, bot._connection)
             self.bot = bot
@@ -88,6 +99,7 @@ class RegisteredChannel(twitchio.Channel):
         self.name = name
         self.join_date = round(time.time()) if join_date is None else join_date
         # self.join_date = join_date or round(time.time()) or 0
+        self.min_perms = min_perms
         # self.case_sensitive_commands = None
         self._command_aliases = {}
         self._keyword_aliases = {}
@@ -228,7 +240,8 @@ class CustomCommand:
     channel_id: int
     author_id: int
     modified_by: int = None
-    aliases: Iterable[str] = dc.field(default_factory=list)
+    # aliases: Iterable[str] = dc.field(default_factory=list)
+    aliases: Iterable[str] = None
     perms: str = None
     count: int = None
     cooldowns: Dict[Rank, int] = dc.field(default_factory=dict)
@@ -240,13 +253,24 @@ class CustomCommand:
     mtime: int = round(time.time())
     expire: Tuple[int, str] = None
 
+    def __repr__(self):
+        # name = self.name[:8] + "..." if len(self.name) > 16 else self.name
+        rstr = f"""
+            <{self.__class__.__name__}(
+                name={self.name},
+                cid={self.channel_id},
+                perms={self.perms},
+                message={self.message}
+            )>"""
+        return rstr
+
     async def __call__(self, context: Context) -> None:
         await self.invoke(context)
 
     async def invoke(self, context: Context) -> None:
         await context.send(self.message)
         self.count += 1
-        self.last
+        # self.last_used_by = context.author.id
 
 
 

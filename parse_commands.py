@@ -4,9 +4,11 @@ from errors import *
 from abcs import Bot
 from utils import eprint
 
+import time
+import sqlite3
+import dataclasses
 from textwrap import dedent
 from typing import Dict, Tuple, Iterable
-import time
 
 
 PARSED_ACTIONS = ('add', 'edit')
@@ -67,7 +69,6 @@ class ManageCmdParser:
                 action = body
                 msg = None
         else:
-            print(f"{self.action_aliases = }")
             action = self.action_aliases.get(ctx.invoked_with, None)
             msg = body.strip() or None
 
@@ -91,7 +92,7 @@ class ManageCmdParser:
 
         action, msg = self.get_action(ctx)
 
-        print(f"action: {action}, msg: {msg}")
+        # print(f"action: {action}, msg: {msg}")
 
         if action not in actions:
             error = f"""
@@ -152,12 +153,13 @@ class ManageCmdParser:
             return usage
 
 
-        print(f"{cmd_dict = }")
         for default in self.config['defaults'].items():
             cmd_dict.setdefault(*default)
         cmd_dict['name'] = name
         cmd_dict['message'] = ' '.join(cmd_dict.get('message')) or None
         cmd_dict['modified_by'] = ctx.author.id
+
+        # print(f"{cmd_dict = }")
 
         return fn_switch[action](ctx, cmd_dict)
 
@@ -176,17 +178,21 @@ class ManageCmdParser:
         ):
         '''Adds a custom command to memory and the database.'''
         if config is None:
-            config = ctx.bot.cfg.commands
+            config = self.config
         # if defaults is None:
             # defaults = ctx.bot.cfg.commands['defaults']
 
+        name = cmd_dict['name']
+        error_preface = f"Failed to add command {name!r}"
+
+        if name in ctx.channel._command_aliases:
+            error = f"{error_preface}. Command {name!r} already exists."
+            raise NameConflict(error)
+
         cid = ctx.channel.id
         cmd_dict.setdefault('author_id', cmd_dict.get('modified_by'))
-        name = cmd_dict['name']
-        # cmd_dict.pop('action')
-
-        error_preface = f"Failed to add command {name!r}"
-        error = ""
+        # cmd_dict['aliases'] = ','.join(cmd_dict.get('aliases', "")) or None
+        cmd_dict['cooldowns'] = ','.join(cmd_dict.get('cooldowns', ""))
 
         if cmd_dict['message'] is None and config.get('require_message'):
             error = f"""
@@ -197,15 +203,16 @@ class ManageCmdParser:
 
         attrs = {k: v for k, v in cmd_dict.items() if v is not None}
         cmd = CustomCommand(**attrs, channel_id=cid)
-        # print("cmd = ", dc.asdict(cmd))
 
-        ctx.bot._channels[cid].commands[name] = cmd
-        cols, vals = zip(*dc.asdict(cmd).items())
+        ctx.bot._channels[cid]._command_aliases[name] = cmd
+        cols, vals = zip(*dataclasses.asdict(cmd).items())
+##        print(f"{cols = }; {vals = }")
         plchd = ','.join(':' + str(c) for c in cols)
-        _sql = f"insert into command ({','.join(cols)}) values ({plchd})"
+
+        _sql = f"insert into custom_command ({','.join(cols)}) values ({plchd})"
         try:
-            with bot._db_conn:
-                bot._db.execute(_sql, vals)
+            with ctx.bot._db_conn:
+                ctx.bot._db.execute(_sql, vals)
         except sqlite3.Error as exc:
             error = f"{error_preface}. DatabaseError: {exc.args[0]}"
             raise DatabaseError(error)
@@ -252,7 +259,7 @@ class ManageCmdParser:
             new_cmd = bot._channels[cid].commands.pop(name)
             bot._channels[cid].commands[new_name] = new_cmd
 
-        # keys, vals = zip(*dc.asdict(cmd).items())
+        # keys, vals = zip(*dataclasses.asdict(cmd).items())
         cols = ','.join(cmd_dict.keys())
         params = ','.join(['?'] * len(cmd_dict))
         cond = f"(cid, name) = ({cid}, {name!r})"
@@ -260,7 +267,7 @@ class ManageCmdParser:
 
         try:
             with bot._db_conn:
-                # bot._db.execute(_sql, dc.astuple(cmd))
+                # bot._db.execute(_sql, dataclasses.astuple(cmd))
                 bot._db.execute(_sql, tuple(cmd_dict.values()))
         except sqlite3.Error as exc:
             error = f"{error_preface}. Database error: {exc.args[0]}"

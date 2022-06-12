@@ -12,7 +12,7 @@ create table if not exists channel (
     id integer primary key
     , name text unique not null
     , join_date int not null
-    , command_prefix text
+    -- , command_prefix text
     , min_perms text
 );
 
