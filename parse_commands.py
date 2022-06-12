@@ -2,6 +2,7 @@ from base_classes import Config, Context, RegisteredChannel, CustomCommand, Buil
 from parsing import cmd_add_parser, cmd_edit_parser, CMD_ARGUMENT_FLAGS
 from errors import *
 from abcs import Bot
+from utils import eprint
 
 from textwrap import dedent
 from typing import Dict, Tuple, Iterable
@@ -50,13 +51,19 @@ class ManageCmdParser:
         the rest of the message. These depend on the literal action following
         the base command name or the alias used.'''
         # cfg = ctx.bot.cfg.commands.copy()
-
+        body = ctx.msg_body
         if ctx.invoked_with == ctx.command.name:
-            action, msg = ctx.msg_body.split(None, 1)
-            return action, msg
-        action = self.alias_switch.get(ctx.invoked_with, None)
-        return action, ctx.msg_body
-        
+            try:
+                action, msg = body.split(None, 1)
+            except ValueError:
+                action = body
+                msg = None
+        else:
+            action = action_aliases.get(ctx.invoked_with, None)
+            msg = body.strip() or None
+
+        return action, msg
+
 
     def manage_commands(self, ctx):
         '''Parses a `!cmd` string and executes `add_command()`, `edit_command()`,
@@ -70,7 +77,8 @@ class ManageCmdParser:
         # print(self.alias_switch)
 
         action, msg = self.get_action(ctx)
-        print(f"{action = }, {msg = }")
+
+        print("action:", action, "msg:", msg)
 
         if action not in actions:
             error = f"""

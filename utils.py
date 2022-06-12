@@ -1,4 +1,5 @@
 import random
+import inspect
 from typing import Any, Union, Callable
 
 
@@ -86,4 +87,13 @@ def remove_from_keys(
         # print(obj)
         # raise TypeError("Bad type...")
     return obj
+
+def eprint(*objs):
+    '''Prints "var =" f-strings so you don't have to, also retaining
+    the original names of variables when called from anywhere.'''
+    stack = inspect.stack()
+    caller_frame = stack[-1].frame
+    varnames = caller_frame.f_code.co_names[1:]
+    for var, obj in zip(varnames, objs):
+        print(f"{var} = {obj}")
 

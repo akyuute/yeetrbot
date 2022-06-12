@@ -68,9 +68,7 @@ class CoreCommands:
         }
     }
 
-    # @register_built_in(name=P+'cmd', aliases=(P+'addcmd', ))
     async def cmd_manage_commands(ctx: Context):
-    # async def command_cmd(bot, ctx: Context):
         resp = ""
         if not ctx.author.is_mod:
             await ctx.send(f"{ctx.author.mention}: Only moderators or higher can use this command.")

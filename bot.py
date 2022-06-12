@@ -120,28 +120,42 @@ class Yeetrbot(Client):
             self._channels[channel.id] = channel
 
     def _init_builtins(self, cls = BuiltInCommand):
+        # Init the core built-ins:
+        BASE_CMD_FUNC = 'cmd_manage_commands'
         core_cfg = self.cfg.commands['core_built_ins']
-
         core_cmds = []
+
         for f in vars(commands.CoreCommands).values():
             if not callable(f):
                 continue
-            # print(f"{f=}")
-            buin = core_cfg.get(f.__name__)
-            # print(f"{buin=}")
-            # buin['name'] = buin.get('name', f.__name__)
+
+            buin = core_cfg.get(f.__name__, None)
+            if buin is None:
+                continue
+
             name = buin.get('name') or f.__name__
             aliases = buin.get('aliases')
+
+            if f.__name__ == BASE_CMD_FUNC:
+                action_aliases = core_cfg[f.__name__].get('action_aliases')
+                aliases += action_aliases.values()
+            print(f"{aliases = }")
+
             perms = buin.get('perms') or self.cfg.commands.get('default_perms')
             count = buin.get('count') or self.cfg.commands.get('default_count')
-            # print(f"{count = !r}")
 
-            core_cmds.append(
-                # cls(**buin)
-                cls(
-                    name=name, callback=f, global_aliases=aliases, perms=perms, count=count
-                )
+            cmd = cls(
+                name=name,
+                callback=f,
+                # global_aliases=aliases,
+                aliases=aliases,
+                perms=perms,
+                count=count
             )
+
+            core_cmds.append(cmd)
+                # cls(**buin)
+
 
         # core_cmds = (
             # cls(
@@ -150,6 +164,7 @@ class Yeetrbot(Client):
                 # callback=f
             # ) for f in
             # vars(commands.CoreCommands).values() if callable(f))
+
         opt_cmds = (c for _, c in
             inspect.getmembers(commands) if isinstance(c, cls))
         cust_cmds = (c for _, c in
@@ -233,6 +248,7 @@ class Yeetrbot(Client):
             on l.id = r.command_id"""
         records = self._db.execute(_sql)
         for row in records:
+            pass
             print(dict(**row))
         # print(dict(**row for row in records))
 
@@ -299,7 +315,6 @@ class Yeetrbot(Client):
         for channel in self.connected_channels:
             chan = await channel.user()
             await self.register_channel(chan.id, channel.name)
-            print(self._channels)
  
     def refresh_user_data(self, user_id: int, name: str):
         '''Updates a channel's name if the username changes.'''
@@ -723,24 +738,31 @@ class Yeetrbot(Client):
         channel = context.channel
         command_name = context.message.content.partition(" ")[0]
         ci_name = command_name.lower()
-        command = (channel.custom_command_aliases.get(ci_name) or
-                   channel.built_in_aliases.get(ci_name))
+        command = (
+            channel.custom_command_aliases.get(ci_name)
+            or channel.built_in_aliases.get(ci_name)
+            or self._built_in_command_aliases.get(ci_name)
+       )
 
-        if command is None:
+        alias = None
+        while command is None:
+        #if command is None:
             alias, command = await self.resolve_long_alias(context)
             # match = await self.resolve_long_alias(context)
-            # if match is not None:
+            #if match is not None:
                 # alias, command = match
             # return
-            context.invoked_with = alias
+            #context.invoked_with = alias
 
-            if command is None:
-                context.invoked_with = None
-                # context.is_valid = False  # Only useful for commands, not keywords.
-                return
+        #if command is None:
+            #context.invoked_with = None
+            # context.is_valid = False  # Only useful for commands, not keywords.
+            return
 
-        else:
-            context.invoked_with = command_name
+        context.invoked_with = command_name if alias is None else alias
+
+        # else:
+            # context.invoked_with = command_name
 
         bot_allows_cs = self.cfg.commands['channels_set_case']
         bot_default_cs = self.cfg.commands['defaults']['case_sensitive']
@@ -797,7 +819,7 @@ class Yeetrbot(Client):
 
     async def handle_commands(self, context: Context):
         # print(vars(context))
-        context.prefix = "!"  # Remove after fixing cmd management
+        # context.prefix = "!"  # Remove after fixing cmd management
 
         content = context.message.content
         # command_name = content.partition(" ")[0]
@@ -829,13 +851,11 @@ class Yeetrbot(Client):
 
     async def event_ready(self):
         '''Have the bot do things upon connection to the Twitch server.'''
-        print(self.user_id)
-        print(f"{self.display_name} is online!")
-        print("Connected channels:", self.connected_channels)
+        print(f"{self.display_name} ({self.user_id}) is online!")
 
         await self.register_initial_channels()
-        print("Registered initial channels.")
-        print(self._channels)
+        # print("Registered initial channels.")
+        print("Registered channels:", self._channels)
 
         # Post a message in each registered channel's chat upon connection:
         # for channel in self.connected_channels:
