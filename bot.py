@@ -122,6 +122,7 @@ class Yeetrbot(Client):
     def _init_builtins(self, cls = BuiltInCommand):
         # Init the core built-ins:
         BASE_CMD_FUNC = 'cmd_manage_commands'
+        ACTION_ALIASES = 'action_aliases'
         core_cfg = self.cfg.commands['core_built_ins']
         core_cmds = []
 
@@ -137,9 +138,8 @@ class Yeetrbot(Client):
             aliases = buin.get('aliases')
 
             if f.__name__ == BASE_CMD_FUNC:
-                action_aliases = core_cfg[f.__name__].get('action_aliases')
+                action_aliases = core_cfg[f.__name__].get(ACTION_ALIASES)
                 aliases += action_aliases.values()
-            print(f"{aliases = }")
 
             perms = buin.get('perms') or self.cfg.commands.get('default_perms')
             count = buin.get('count') or self.cfg.commands.get('default_count')

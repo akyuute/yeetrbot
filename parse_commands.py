@@ -32,11 +32,19 @@ class ManageCmdParser:
 
     def __init__(self, bot, command_config: dict = None):
         self.bot = bot
-        # self.config = command_config
+        self.config = command_config
         if command_config is None:
             self.config = bot.cfg.commands
-        self.action_aliases = self.config[
-            'core_built_ins']['cmd_manage_commands']['action_aliases']
+
+        self.base_cmd = self.config['core_built_ins']['cmd_manage_commands']
+        self.action_aliases = {
+            v: k for k, v in self.base_cmd['action_aliases'].items()}
+        actions = self.action_aliases.values()
+        base_opts = "<command> [options ...]"
+        self.base_usage = (
+            f"{self.base_cmd['name']} "
+            f"{{{' | '.join(actions)}}} {base_opts}"
+        )
 
     @property
     def alias_switch(self):
@@ -50,8 +58,8 @@ class ManageCmdParser:
         '''Returns the implied action of a command management invocation and
         the rest of the message. These depend on the literal action following
         the base command name or the alias used.'''
-        # cfg = ctx.bot.cfg.commands.copy()
         body = ctx.msg_body
+
         if ctx.invoked_with == ctx.command.name:
             try:
                 action, msg = body.split(None, 1)
@@ -59,32 +67,42 @@ class ManageCmdParser:
                 action = body
                 msg = None
         else:
-            action = action_aliases.get(ctx.invoked_with, None)
+            print(f"{self.action_aliases = }")
+            action = self.action_aliases.get(ctx.invoked_with, None)
             msg = body.strip() or None
 
         return action, msg
 
 
-    def manage_commands(self, ctx):
+    def manage_commands(self, ctx: Context):
         '''Parses a `!cmd` string and executes `add_command()`, `edit_command()`,
         `toggle_command()` or `delete_command()` based on the implied action.'''
 
         cfg = ctx.bot.cfg.commands
-        base_cmd = cfg['core_built_ins']['cmd_manage_commands']
+        base_cmd = self.base_cmd
         fn_switch = base_cmd['fn_switch']
-        actions = fn_switch.keys()
+        actions = self.action_aliases.values()
         # fn_switch = FN_SWITCH
         # print(self.alias_switch)
 
+        if len(ctx.msg_body.split()) < 1:
+            resp = f"{self.base_cmd['name']} usage: {self.base_usage!r}"
+            raise CommandHelpMessage(resp)
+
         action, msg = self.get_action(ctx)
 
-        print("action:", action, "msg:", msg)
+        print(f"action: {action}, msg: {msg}")
 
         if action not in actions:
             error = f"""
-                Invalid action for {base_cmd['name']}: {action!r}."
-                {base_cmd['name']} usage: {base_usage!r}"""
+                Invalid action for {self.base_cmd['name']}: {action!r}.
+                {self.base_cmd['name']} usage: {self.base_usage!r}"""
             raise InvalidAction(dedent(error))
+
+        if msg is None:
+            resp = "Imagine this is the syntax for whatever you're trying to do..."
+            raise CommandHelpMessage(resp)
+            # return
 
         if action not in PARSED_ACTIONS:
             names = set(msg.split())

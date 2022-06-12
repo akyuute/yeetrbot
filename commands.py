@@ -90,6 +90,7 @@ class CoreCommands:
             NameConflict,
             CommandNotFoundError,
             InvalidSyntax,
+            CommandHelpMessage,
             ParsingError,
             DatabaseError,
             NotImplementedError
