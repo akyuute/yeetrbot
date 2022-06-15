@@ -90,7 +90,9 @@ class GroupByDelimiter(argparse.Action):
         
 
 cmd_add_or_edit = QuietParser(prog='!cmd',
-    add_help=False)
+    add_help=False,
+    argument_default=argparse.SUPPRESS,
+    )
 cmd_add_or_edit.set_defaults(
     # default=None,
     # default=argparse.SUPPRESS,
@@ -102,47 +104,52 @@ cmd_add_or_edit.set_defaults(
 
 cmd_add_or_edit.add_argument('--help', '-h',
         action='store_true',
-        default=argparse.SUPPRESS)
+        # default=argparse.SUPPRESS
+        )
 
 cmd_add_or_edit.add_argument('--perms', '-p',
     choices="everyone vip moderator owner rank=".split(),
-    default=argparse.SUPPRESS,
-    type=lambda s: s.lower())
+    # default=argparse.SUPPRESS,
+    type=lambda s: s.lower()
+    )
 
-cmd_add_or_edit.add_argument('--aliases', '-a', nargs=1,
-    default=argparse.SUPPRESS,
+cmd_add_or_edit.add_argument('--aliases', '-a',
+    nargs=1,
+    # nargs='*',
+    # type,=lambda l: l[0] if len(l) else None
+    # default=argparse.SUPPRESS,
     )
 
 cmd_add_or_edit.add_argument('--count', '-c', type=int,
-    default=argparse.SUPPRESS,
+    # default=argparse.SUPPRESS,
     )
 
 cmd_add_or_edit.add_argument('--case-sensitive', '-I',
-    default=argparse.SUPPRESS,
+    # default=argparse.SUPPRESS,
     )
 
 cmd_add_or_edit.add_argument('--disable', '-d',
-    default=argparse.SUPPRESS,
+    # default=argparse.SUPPRESS,
     action='store_false',
     dest='is_enabled')
 
 cmd_add_or_edit.add_argument('--enable', '-e',
-    default=argparse.SUPPRESS,
+    # default=argparse.SUPPRESS,
     action='store_true',
     dest='is_enabled')
 
 cmd_add_or_edit.add_argument('--hide',
-    default=argparse.SUPPRESS,
+    # default=argparse.SUPPRESS,
     action='store_true',
     dest='is_hidden')
 
 cmd_add_or_edit.add_argument('--unhide',
-    default=argparse.SUPPRESS,
+    # default=argparse.SUPPRESS,
     action='store_false',
     dest='is_hidden')
 
 cmd_add_or_edit.add_argument('--expire', '-x',
-    default=argparse.SUPPRESS,
+    # default=argparse.SUPPRESS,
     action=GroupByDelimiter,
     delimiters=GROUP_DELIMITERS)
 
@@ -152,8 +159,9 @@ cmd_add_or_edit.add_argument('--expire', '-x',
     # delimiters=GROUP_DELIMITERS)
 
 # cmd_add_or_edit.add_argument('--override_builtin', action='store_true')
-cmd_add_or_edit.add_argument('message', nargs=argparse.REMAINDER,
-    default=argparse.SUPPRESS,
+cmd_add_or_edit.add_argument('message',
+    nargs=argparse.REMAINDER,
+    # default=argparse.SUPPRESS,
     )
 
 cmd_add_parser = QuietParser('add', parents=[cmd_add_or_edit],

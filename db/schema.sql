@@ -59,19 +59,20 @@ create table if not exists channel_built_in_data (
 create table if not exists custom_command (
     id integer primary key
     , channel_id integer not null
+    , author_id integer not null
+    , modified_by integer not null
     , name text unique not null
     , message text
-    , aliases text
+    , alias_str json
+    -- , aliases text
     , perms text not null
     , count integer
-    , cooldowns text -- e.g.: "3,10,5,0,'Weebs':30" for (Global,Everyone,VIP,Moderator,<Rank(name='Weebs')>)
+    , cooldowns json -- e.g.: "3,10,5,0,'Weebs':30" for (Global,Everyone,VIP,Moderator,<Rank(name='Weebs')>)
     , case_sensitive integer not null
     , expire integer
     , expire_action text
     , is_enabled integer not null
     , is_hidden integer not null
-    , author_id integer not null
-    , modified_by integer not null
     -- , is_builtin integer not null
     , ctime integer not null
     , mtime integer not null

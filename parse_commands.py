@@ -5,6 +5,7 @@ from abcs import Bot
 from utils import eprint
 
 import time
+import json
 import sqlite3
 import dataclasses
 from textwrap import dedent
@@ -101,9 +102,10 @@ class ManageCmdParser:
             raise InvalidAction(dedent(error))
 
         if msg is None:
-            resp = "Imagine this is the syntax for whatever you're trying to do..."
-            raise CommandHelpMessage(resp)
-            # return
+            resp =  f"{ctx.invoked_with} syntax: ..."
+            # resp = "Imagine this is the syntax for whatever you're trying to do..."
+            # raise CommandHelpMessage(resp)
+            return resp
 
         if action not in PARSED_ACTIONS:
             names = set(msg.split())
@@ -157,7 +159,10 @@ class ManageCmdParser:
             cmd_dict.setdefault(*default)
         cmd_dict['name'] = name
         cmd_dict['message'] = ' '.join(cmd_dict.get('message')) or None
-        cmd_dict['modified_by'] = ctx.author.id
+        # aliases = cmd_dict.pop('aliases')
+        # cmd_dict['aliases'] = aliases[0].split(',') if len(aliases) else None
+        # cmd_dict['alias_str'] = json.dumps(aliases)
+        cmd_dict['modified_by'] = int(ctx.author.id)
 
         # print(f"{cmd_dict = }")
 
@@ -189,11 +194,6 @@ class ManageCmdParser:
             error = f"{error_preface}. Command {name!r} already exists."
             raise NameConflict(error)
 
-        cid = ctx.channel.id
-        cmd_dict.setdefault('author_id', cmd_dict.get('modified_by'))
-        # cmd_dict['aliases'] = ','.join(cmd_dict.get('aliases', "")) or None
-        cmd_dict['cooldowns'] = ','.join(cmd_dict.get('cooldowns', ""))
-
         if cmd_dict['message'] is None and config.get('require_message'):
             error = f"""
                 {error_preface}.
@@ -201,21 +201,40 @@ class ManageCmdParser:
                 Messages must come after any arguments."""
             raise RegistrationError(dedent(error))
 
-        attrs = {k: v for k, v in cmd_dict.items() if v is not None}
-        cmd = CustomCommand(**attrs, channel_id=cid)
+        cid = ctx.channel.id
+        print(type(cid))
+        cmd_dict.setdefault('author_id', cmd_dict.get('modified_by'))
+        # cmd_dict['aliases'] = ','.join(cmd_dict.get('aliases', "")) or None
+        cmd_dict['cooldowns'] = ','.join(cmd_dict.get('cooldowns', ""))
 
-        ctx.bot._channels[cid]._command_aliases[name] = cmd
-        cols, vals = zip(*dataclasses.asdict(cmd).items())
-##        print(f"{cols = }; {vals = }")
+        attrs = {k: v for k, v in cmd_dict.items() if v is not None}
+        # attrs['channel_id'] = cid
+        print(f"{attrs = }")
+
+        cmd = CustomCommand(**attrs, channel_id=cid)
+        db_ready = dataclasses.asdict(cmd)
+        # db_ready.pop
+        aliases = db_ready.pop('aliases')
+        db_ready['alias_str'] = json.dumps(aliases)
+        # db_ready['aliases'] = ','.join(db_ready['aliases'])
+        print(f"{db_ready = }")
+
+        cols, vals = zip(*db_ready.items())
+        # cols, vals = zip(*attrs.items())
+        # print(f"{cols = }; {vals = }")
         plchd = ','.join(':' + str(c) for c in cols)
 
         _sql = f"insert into custom_command ({','.join(cols)}) values ({plchd})"
         try:
-            with ctx.bot._db_conn:
-                ctx.bot._db.execute(_sql, vals)
+            # with ctx.bot._db_conn:
+            ctx.bot._db.execute(_sql, vals)
         except sqlite3.Error as exc:
             error = f"{error_preface}. DatabaseError: {exc.args[0]}"
             raise DatabaseError(error)
+
+        cmd = CustomCommand(**attrs, channel_id=cid)
+        ctx.bot._channels[cid]._command_aliases[name] = cmd
+
         print("Added:", cmd)
         return f"Successfully added command {name}."
 

@@ -242,26 +242,29 @@ class CustomCommand:
     modified_by: int = None
     # aliases: Iterable[str] = dc.field(default_factory=list)
     aliases: Iterable[str] = None
+    # _aliases: str = None
     perms: str = None
     count: int = None
     cooldowns: Dict[Rank, int] = dc.field(default_factory=dict)
-    case_sensitive: bool = False
-    is_hidden: bool = False
-    is_enabled: bool = True
+    case_sensitive: bool = None
+    is_hidden: bool = None
+    is_enabled: bool = None
     # Times in seconds since epoch; use time.gmtime() to convert to UTC
     ctime: int = round(time.time())
     mtime: int = round(time.time())
     expire: Tuple[int, str] = None
 
+    @property
+    def alias_str(self) -> str:
+        return ','.join(self.aliases)
+
+##    @property
+##    def aliases(self) -> list:
+##        return self._aliases.split(',')
+
     def __repr__(self):
         # name = self.name[:8] + "..." if len(self.name) > 16 else self.name
-        rstr = f"""
-            <{self.__class__.__name__}(
-                name={self.name},
-                cid={self.channel_id},
-                perms={self.perms},
-                message={self.message}
-            )>"""
+        rstr = f"""<{self.__class__.__name__}( name={self.name}, cid={self.channel_id}, perms={self.perms}, message={self.message})>"""
         return rstr
 
     async def __call__(self, context: Context) -> None:

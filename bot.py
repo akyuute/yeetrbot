@@ -249,7 +249,7 @@ class Yeetrbot(Client):
         records = self._db.execute(_sql)
         for row in records:
             pass
-            print(dict(**row))
+            # print(dict(**row))
         # print(dict(**row for row in records))
 
 
