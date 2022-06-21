@@ -1,25 +1,38 @@
+### Example bot config file ###
+# Copy this file and add your own information.
+# Pass the new filename to the bot's instantiation in run.py.
+
 bot:
 
   # The OAuth token and client ID for your bot's Twitch account.
   # They can be obtained from https://twitchtokengenerator.com/
-  credentials:
-    token: oauth:
-    client_id: 
-    client_secret: 
+  twitch_credentials:
+    client_id: <client_id>
+    token: <token>
+    client_secret: # Optional; see Twitch documentation
+
+  # Credentials for the Twitch API.
+  twitch_api_credentials:
+    client_id: <client_id>
+    token: <token>
+
+  # Credentials for the bot's Discord account, if enabled.
+  discord_credentials:
+    token: <token>
 
   # The list of channels to join before those registered in the database.
   initial_channels:
-    - 
+    -
 
   # Seconds to wait before responding to a duplicate (spammed) message.
   # The default is 30.0.
-  # NOTE: Code for handling the messages is still run and counts are incremented. This
-  # may no longer be the case.
+  # NOTE: Code for handling the messages is still run and counts are incremented.
+  # However, this may no longer be the case.
   # Default: 3.0 for debugging, 30.0 from TwitchIO
   heartbeat: 3
 
   # The name by which the bot should refer to itself.
-  display_name: 
+  display_name: <display_name>
 
 
 commands:

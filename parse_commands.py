@@ -202,14 +202,13 @@ class ManageCmdParser:
             raise RegistrationError(dedent(error))
 
         cid = ctx.channel.id
-        print(type(cid))
         cmd_dict.setdefault('author_id', cmd_dict.get('modified_by'))
         # cmd_dict['aliases'] = ','.join(cmd_dict.get('aliases', "")) or None
         cmd_dict['cooldowns'] = ','.join(cmd_dict.get('cooldowns', ""))
 
         attrs = {k: v for k, v in cmd_dict.items() if v is not None}
         # attrs['channel_id'] = cid
-        print(f"{attrs = }")
+        # print(f"{attrs = }")
 
         cmd = CustomCommand(**attrs, channel_id=cid)
         db_ready = dataclasses.asdict(cmd)
@@ -217,7 +216,8 @@ class ManageCmdParser:
         aliases = db_ready.pop('aliases')
         db_ready['alias_str'] = json.dumps(aliases)
         # db_ready['aliases'] = ','.join(db_ready['aliases'])
-        print(f"{db_ready = }")
+
+        # print(f"{db_ready = }")
 
         cols, vals = zip(*db_ready.items())
         # cols, vals = zip(*attrs.items())

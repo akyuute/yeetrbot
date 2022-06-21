@@ -63,7 +63,7 @@ class Yeetrbot(Client):
 
         initial_channels = self.cfg.bot.get('initial_channels')
         self._initial_channels = set(initial_channels + self.channels)
-        creds = self.cfg.bot['credentials']
+        creds = self.cfg.bot['twitch_credentials']
 
         super().__init__(
             token=creds['token'],
